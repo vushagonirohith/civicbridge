@@ -11,7 +11,13 @@ from datetime import datetime
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["https://civicbridge-1.onrender.com", "http://localhost:8000", "http://localhost:5000"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 # Supabase connection
 SUPABASE_URL = os.getenv('SUPABASE_URL')
