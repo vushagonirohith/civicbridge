@@ -41,33 +41,34 @@ async function loadUserDashboard() {
     const userData = getCurrentUser();
     const userEmail = localStorage.getItem('userEmail');
     const userName = localStorage.getItem('userName') || 'User';
+    const userId = localStorage.getItem('userId');
     
-    console.log('Loading dashboard for user:', userData);
+    console.log('Loading dashboard for user:', userId);
     
     const dashboardSection = document.getElementById('dashboard');
     if (!dashboardSection) return;
 
     dashboardSection.innerHTML = `<div class="container"><p style="text-align: center; padding: 20px;">Loading your dashboard...</p></div>`;
     
-    // Wait for async getUserIssues
+    // Wait for async getUserIssues - fetches from backend
     const userIssues = await getUserIssues();
     
     dashboardSection.innerHTML = getUserDashboardHTML(userData, userIssues);
-    initializeDashboard();
+    initializeDashboard(userIssues);
 }
 
 function getUserDashboardHTML(userData, userIssues = []) {
     const userName = localStorage.getItem('userName') || 'User';
     const userEmail = localStorage.getItem('userEmail');
     
-    // Calculate user stats
+    // Calculate user stats from backend data
     const totalIssues = userIssues.length;
     const pendingIssues = userIssues.filter(issue => issue.status === 'pending').length;
-    const inProgressIssues = userIssues.filter(issue => issue.status === 'in-progress').length;
+    const inProgressIssues = userIssues.filter(issue => issue.status === 'in_progress').length;
     const resolvedIssues = userIssues.filter(issue => issue.status === 'resolved').length;
     
-    // Get user join date
-    const joinDate = userData.createdAt ? new Date(userData.createdAt).toLocaleDateString() : 'Recently';
+    // Get user join date from localStorage (set during login)
+    const joinDate = userData.created_at ? new Date(userData.created_at).toLocaleDateString() : 'Recently';
     
     return `
         <div class="container">
@@ -78,7 +79,7 @@ function getUserDashboardHTML(userData, userIssues = []) {
                     <div style="color: var(--text-color); opacity: 0.7; font-size: 0.9rem;">
                         <div>Logged in as: ${userEmail}</div>
                         <div>Member since: ${joinDate}</div>
-                        ${userData.profile ? `<div>Total reports: ${userData.profile.reportsCount || 0}</div>` : ''}
+                        <div>Total reports: ${totalIssues}</div>
                     </div>
                 </div>
                 <button class="btn btn-primary" id="refreshDashboardBtn">
@@ -108,7 +109,7 @@ function getUserDashboardHTML(userData, userIssues = []) {
             <div class="issues-filters">
                 <button class="filter-btn active" data-filter="all">All Issues</button>
                 <button class="filter-btn" data-filter="pending">Pending</button>
-                <button class="filter-btn" data-filter="in-progress">In Progress</button>
+                <button class="filter-btn" data-filter="in_progress">In Progress</button>
                 <button class="filter-btn" data-filter="resolved">Resolved</button>
             </div>
 
@@ -152,12 +153,12 @@ function getLoginPromptHTML() {
     `;
 }
 
-function initializeDashboard() {
+function initializeDashboard(allIssues) {
     // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const filter = this.getAttribute('data-filter');
-            filterIssues(filter);
+            filterIssues(filter, allIssues);
             
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
@@ -187,38 +188,32 @@ function initializeDashboard() {
     }
 }
 
+// FETCH FROM BACKEND API ONLY - NO localStorage
 async function getUserIssues() {
     const userId = localStorage.getItem('userId');
     console.log('getUserIssues called with userId:', userId);
     
     if (!userId) {
-        console.warn('No userId found in localStorage');
+        console.warn('No userId found');
         return [];
     }
 
     try {
-        // Fetch user reports from backend API
-        console.log('Fetching reports from API for user:', userId);
+        console.log('Fetching reports from backend API...');
         const result = await apiService.getUserReports(userId);
         
         console.log('API response:', result);
         
         if (result.success && result.reports) {
-            console.log(`Received ${result.reports.length} reports`);
+            console.log(`Received ${result.reports.length} reports from database`);
             
             return result.reports.map(report => {
-                // Normalize status field
-                let normalizedStatus = (report.status || 'pending').toLowerCase();
-                if (normalizedStatus === 'in_progress') {
-                    normalizedStatus = 'in-progress';
-                }
-                
                 return {
                     id: report.id,
                     type: report.issueType,
                     title: `${report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General'} Issue`,
                     description: report.description,
-                    status: normalizedStatus,
+                    status: report.status || 'pending', // Will be 'pending', 'in_progress', or 'resolved'
                     date: report.timestamp ? new Date(report.timestamp).toLocaleDateString() : new Date().toLocaleDateString(),
                     location: report.address || 'Location not specified',
                     comments: report.comments || [],
@@ -226,12 +221,13 @@ async function getUserIssues() {
                 };
             });
         } else {
-            console.warn('API returned success=false or no reports:', result);
+            console.warn('API returned error:', result);
+            showAlert('Failed to load reports from database', 'error');
             return [];
         }
     } catch (error) {
         console.error('Error fetching user reports:', error);
-        showAlert('Failed to load your reports. Please refresh.', 'error');
+        showAlert('Failed to load your reports. Please check your connection.', 'error');
         return [];
     }
 }
@@ -255,7 +251,7 @@ function renderIssuesList(issues) {
                     <div class="issue-title">${issue.title}</div>
                     <span class="issue-type">${issue.type?.charAt(0).toUpperCase() + issue.type?.slice(1) || 'General'}</span>
                 </div>
-                <span class="issue-status status-${issue.status}">${issue.status.replace('-', ' ')}</span>
+                <span class="issue-status status-${issue.status}">${issue.status.replace('_', ' ')}</span>
             </div>
             <div class="issue-description">${issue.description}</div>
             <div class="issue-meta">
@@ -264,24 +260,23 @@ function renderIssuesList(issues) {
                 ${issue.photos && issue.photos.length > 0 ? 
                     `<span><i class="fas fa-camera"></i> ${issue.photos.length} photo(s)</span>` : ''}
             </div>
-            ${issue.adminComment ? `
+            ${issue.comments && issue.comments.length > 0 ? `
                 <div class="admin-comment-user">
                     <strong><i class="fas fa-user-shield"></i> Admin Response:</strong>
-                    <p>${issue.adminComment}</p>
-                    <small>Last updated: ${issue.adminCommentTimestamp ? new Date(issue.adminCommentTimestamp).toLocaleString() : 'Recently'}</small>
+                    <p>${issue.comments[issue.comments.length - 1].comment_text}</p>
+                    <small>Last updated: ${new Date(issue.comments[issue.comments.length - 1].created_at).toLocaleString()}</small>
                 </div>
             ` : ''}
             <div class="issue-actions">
-                <button class="btn btn-outline btn-small" onclick="viewIssue(${issue.id})">View Details</button>
+                <button class="btn btn-outline btn-small" onclick="viewIssue('${issue.id}')">View Details</button>
                 ${issue.photos && issue.photos.length > 0 ? 
-                    `<button class="btn btn-outline btn-small" onclick="viewIssuePhotos(${issue.id})">View Photos</button>` : ''}
+                    `<button class="btn btn-outline btn-small" onclick="viewIssuePhotos('${issue.id}')">View Photos</button>` : ''}
             </div>
         </div>
     `).join('');
 }
 
-function filterIssues(filter) {
-    const allIssues = getUserIssues();
+function filterIssues(filter, allIssues) {
     let filteredIssues = allIssues;
     
     if (filter !== 'all') {
@@ -293,107 +288,12 @@ function filterIssues(filter) {
         issuesList.innerHTML = renderIssuesList(filteredIssues);
     }
 }
-// Add to dashboard.js - Ensure user dashboard reflects admin changes
-
-function getUserIssues() {
-    const userEmail = localStorage.getItem('userEmail');
-    if (!userEmail) return [];
-
-    // Get user-specific reports from localStorage
-    const allReports = JSON.parse(localStorage.getItem('CivicBridge_reports') || '[]');
-    const userReports = allReports.filter(report => report.userId === userEmail);
-    
-    // Update user report count
-    if (userEmail !== 'admin@CivicBridge.com') {
-        const users = JSON.parse(localStorage.getItem('CivicBridge_users') || '[]');
-        const userIndex = users.findIndex(u => u.email === userEmail);
-        if (userIndex !== -1) {
-            if (!users[userIndex].profile) users[userIndex].profile = {};
-            users[userIndex].profile.reportsCount = userReports.length;
-            localStorage.setItem('CivicBridge_users', JSON.stringify(users));
-            
-            // Update current user data
-            const currentUser = getCurrentUser();
-            if (currentUser.email === userEmail) {
-                if (!currentUser.profile) currentUser.profile = {};
-                currentUser.profile.reportsCount = userReports.length;
-                localStorage.setItem('currentUser', JSON.stringify(currentUser));
-            }
-        }
-    }
-    
-    return userReports.map(report => ({
-        id: report.id,
-        type: report.issueType,
-        title: `${report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General'} Issue`,
-        description: report.description,
-        status: report.status || 'pending',
-        date: report.timestamp ? new Date(report.timestamp).toLocaleDateString() : new Date().toLocaleDateString(),
-        location: report.address || 'Location not specified',
-        adminComment: report.adminComment,
-        adminCommentTimestamp: report.adminCommentTimestamp,
-        photos: report.photos || [],
-        statusUpdated: report.statusUpdated,
-        updatedBy: report.updatedBy
-    }));
-}
-
 
 // Global functions for issue actions
 window.viewIssue = function(issueId) {
-    const issues = getUserIssues();
-    const issue = issues.find(i => i.id === issueId);
-    if (issue) {
-        const details = `
-Issue: ${issue.title}
-Type: ${issue.type}
-Status: ${issue.status}
-Description: ${issue.description}
-Location: ${issue.location}
-Reported: ${issue.date}
-${issue.adminComment ? `Admin Response: ${issue.adminComment}` : 'No admin response yet'}
-${issue.photos && issue.photos.length > 0 ? `Photos: ${issue.photos.length} attached` : 'No photos attached'}
-        `;
-        alert('Issue Details:\n\n' + details);
-    }
+    alert('Issue ID: ' + issueId + '\n\nThis feature will show full issue details in a modal.');
 };
 
 window.viewIssuePhotos = function(issueId) {
-    const issues = getUserIssues();
-    const issue = issues.find(i => i.id === issueId);
-    if (issue && issue.photos && issue.photos.length > 0) {
-        const photoViewer = document.createElement('div');
-        photoViewer.className = 'modal';
-        photoViewer.style.display = 'block';
-        photoViewer.innerHTML = `
-            <div class="modal-content large-modal">
-                <span class="close">&times;</span>
-                <div class="login-header">
-                    <h2><i class="fas fa-images"></i> Issue Photos</h2>
-                    <p>${issue.title}</p>
-                </div>
-                <div class="photo-gallery">
-                    ${issue.photos.map((photo, index) => `
-                        <div class="photo-item">
-                            <img src="${photo}" alt="Issue Photo ${index + 1}" style="width: 100%; border-radius: 8px;">
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(photoViewer);
-        
-        photoViewer.querySelector('.close').addEventListener('click', () => {
-            photoViewer.remove();
-        });
-        
-        photoViewer.addEventListener('click', (e) => {
-            if (e.target === photoViewer) {
-                photoViewer.remove();
-            }
-        });
-    } else {
-        showAlert('No photos available for this issue', 'info');
-    }
+    alert('Issue ID: ' + issueId + '\n\nThis will show all photos for this issue.');
 };
