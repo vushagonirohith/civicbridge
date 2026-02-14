@@ -1,7 +1,7 @@
 // main.js
 
-// API Configuration
-const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbx-yqpyh_AIkcwDSc7emJEVl_JypS7hBdk6yS9DsWgcnmB_Ioeqp2GCwCrIrwfRjAur/exec';
+// API Configuration - Now using backend API (see api.js)
+// All API calls are handled by apiService in api.js
 
 // Global state
 const appState = {
