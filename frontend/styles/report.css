@@ -1,0 +1,359 @@
+/* Report Modal Styles */
+.large-modal {
+    max-width: 800px !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    margin: 5% auto !important;
+}
+
+#reportForm {
+    max-height: calc(90vh - 150px);
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+/* Custom scrollbar for modal */
+.large-modal::-webkit-scrollbar {
+    width: 8px;
+}
+
+.large-modal::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.large-modal::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.large-modal::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+#mapContainer {
+    position: relative;
+    height: 300px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    margin-bottom: 10px;
+}
+
+#map {
+    height: 100%;
+    width: 100%;
+}
+
+.map-overlay {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.map-instructions {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    color: #333;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.map-instructions i {
+    color: var(--secondary);
+    margin-right: 5px;
+}
+
+.coordinates-display {
+    text-align: center;
+    padding: 8px;
+    background: #e9ecef !important;
+    border: 1px solid #ced4da !important;
+    border-radius: 4px !important;
+    font-family: monospace !important;
+    font-size: 0.9rem !important;
+    color: var(--text-color);
+    margin-top: 10px !important;
+}
+
+.search-container {
+    position: relative;
+    display: flex;
+    gap: 10px;
+}
+
+.location-btn {
+    padding: 8px 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.upload-container {
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    transition: border-color 0.3s;
+}
+
+.upload-container:hover {
+    border-color: var(--secondary);
+}
+
+.upload-placeholder {
+    color: var(--text-color);
+    opacity: 0.7;
+}
+
+.upload-placeholder i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    display: block;
+    color: var(--secondary);
+}
+
+#photoUpload {
+    display: none;
+}
+
+.upload-preview {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.preview-image {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.preview-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.remove-image {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(231, 76, 60, 0.9);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+/* Interactive Map Section */
+.map-section {
+    padding: 5rem 0;
+    background-color: var(--card-bg);
+}
+
+.map-container {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color);
+}
+
+#communityMap {
+    height: 500px;
+    width: 100%;
+}
+
+.map-controls {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 1000;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.map-legend {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: var(--card-bg);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    border: 1px solid var(--border-color);
+}
+
+.map-legend h4 {
+    margin-bottom: 10px;
+    color: var(--text-color);
+    font-size: 0.9rem;
+}
+
+.legend-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--text-color);
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.legend-color.pending {
+    background-color: #f39c12;
+}
+
+.legend-color.in-progress {
+    background-color: #3498db;
+}
+
+.legend-color.resolved {
+    background-color: #2ecc71;
+}
+
+/* Map info window styles */
+.map-info-window {
+    padding: 10px;
+    min-width: 200px;
+    color: #333;
+}
+
+.map-info-window h3 {
+    margin: 0 0 8px 0;
+    color: #2c3e50;
+    font-size: 1.1rem;
+}
+
+.map-info-window p {
+    margin: 4px 0;
+    font-size: 0.9rem;
+}
+
+.map-info-window .btn-small {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    margin-top: 8px;
+}
+
+.status-pending { color: #f39c12; font-weight: bold; }
+.status-in-progress { color: #3498db; font-weight: bold; }
+.status-resolved { color: #2ecc71; font-weight: bold; }
+
+/* Dark mode fixes for maps */
+[data-theme="dark"] .map-instructions {
+    background: rgba(44, 62, 80, 0.95);
+    color: #ecf0f1;
+}
+
+[data-theme="dark"] .coordinates-display {
+    background: var(--light) !important;
+    color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .map-info-window {
+    color: #ecf0f1;
+}
+
+[data-theme="dark"] .map-info-window h3 {
+    color: #ecf0f1;
+}
+
+/* Full Width Button for Live Location */
+.btn-full-width {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 15px;
+    font-size: 1rem;
+}
+
+/* Map Fallback Styles */
+.map-fallback {
+    border: 2px dashed #dee2e6 !important;
+}
+
+.map-fallback h4 {
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .large-modal {
+        margin: 5% auto;
+        width: 95%;
+    }
+    
+    #mapContainer {
+        height: 250px;
+    }
+    
+    .search-container {
+        flex-direction: column;
+    }
+    
+    .location-btn {
+        align-self: flex-start;
+    }
+    
+    /* Map Section Responsive */
+    #communityMap {
+        height: 400px;
+    }
+    
+    .map-controls {
+        position: static;
+        padding: 15px;
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border-color);
+        justify-content: center;
+    }
+    
+    .map-legend {
+        position: static;
+        margin-top: 0;
+        border-top: 1px solid var(--border-color);
+        border-radius: 0 0 12px 12px;
+    }
+    
+    .legend-items {
+        flex-direction: row;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+}

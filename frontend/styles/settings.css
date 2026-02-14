@@ -1,0 +1,439 @@
+/* Settings Modal Styles */
+.settings-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.settings-header h2 {
+    color: var(--text-color);
+    margin-bottom: 10px;
+    font-size: 1.8rem;
+}
+
+.settings-header p {
+    color: var(--text-color);
+    opacity: 0.8;
+}
+
+.settings-header i {
+    margin-right: 10px;
+    color: var(--secondary);
+}
+
+.settings-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 20px;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 12px 20px;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-color);
+    opacity: 0.7;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s;
+}
+
+.tab-btn.active {
+    opacity: 1;
+    border-bottom-color: var(--secondary);
+    color: var(--secondary);
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+.setting-group {
+    margin-bottom: 30px;
+}
+
+.setting-group h3 {
+    color: var(--text-color);
+    margin-bottom: 5px;
+}
+
+.setting-group p {
+    color: var(--text-color);
+    opacity: 0.8;
+    margin-bottom: 15px;
+}
+
+/* Theme Options */
+.theme-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.theme-option {
+    text-align: center;
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 8px;
+    transition: all 0.3s;
+    border: 2px solid transparent;
+}
+
+.theme-option:hover {
+    background: var(--light);
+}
+
+.theme-option.active {
+    border-color: var(--secondary);
+}
+
+.theme-option span {
+    color: var(--text-color);
+    font-weight: 500;
+}
+
+.theme-preview {
+    width: 80px;
+    height: 60px;
+    border-radius: 6px;
+    margin: 0 auto 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.light-theme {
+    background: #f5f7fa;
+}
+
+.light-theme .preview-header {
+    height: 12px;
+    background: #2c3e50;
+}
+
+.light-theme .preview-content {
+    padding: 8px;
+}
+
+.light-theme .preview-card {
+    height: 8px;
+    background: white;
+    margin-bottom: 4px;
+    border-radius: 2px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.dark-theme {
+    background: #1a1a1a;
+}
+
+.dark-theme .preview-header {
+    height: 12px;
+    background: #34495e;
+}
+
+.dark-theme .preview-content {
+    padding: 8px;
+}
+
+.dark-theme .preview-card {
+    height: 8px;
+    background: #2c3e50;
+    margin-bottom: 4px;
+    border-radius: 2px;
+}
+
+.auto-theme {
+    background: linear-gradient(90deg, #f5f7fa 50%, #1a1a1a 50%);
+}
+
+.auto-theme .preview-header {
+    height: 12px;
+    background: linear-gradient(90deg, #2c3e50 50%, #34495e 50%);
+}
+
+.auto-theme .preview-content {
+    padding: 8px;
+    display: flex;
+}
+
+.auto-theme .preview-card {
+    height: 8px;
+    flex: 1;
+    margin: 0 2px;
+    border-radius: 2px;
+}
+
+.auto-theme .preview-card:first-child {
+    background: white;
+}
+
+.auto-theme .preview-card:last-child {
+    background: #2c3e50;
+}
+
+/* Toggle Switch */
+.toggle-setting {
+    margin-bottom: 15px;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: 10px 0;
+}
+
+.toggle-label span:first-child {
+    color: var(--text-color);
+}
+
+.toggle-label input {
+    display: none;
+}
+
+.toggle-slider {
+    position: relative;
+    width: 50px;
+    height: 24px;
+    background: #ccc;
+    border-radius: 24px;
+    transition: all 0.3s;
+}
+
+.toggle-slider:before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    left: 2px;
+    transition: all 0.3s;
+}
+
+input:checked + .toggle-slider {
+    background: var(--secondary);
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(26px);
+}
+
+/* About and Guide Styles */
+.about-content, .guide-content {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.app-info {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.app-icon {
+    width: 60px;
+    height: 60px;
+    background: var(--secondary);
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 15px;
+}
+
+.app-icon i {
+    font-size: 1.8rem;
+    color: white;
+}
+
+.app-info h3 {
+    color: var(--text-color);
+    margin-bottom: 5px;
+}
+
+.version {
+    color: var(--text-color);
+    opacity: 0.7;
+    font-size: 0.9rem;
+}
+
+.about-text h4, .guide-tips h4 {
+    color: var(--text-color);
+    margin: 20px 0 10px;
+}
+
+.about-text p, .guide-content p {
+    color: var(--text-color);
+    opacity: 0.9;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+.about-text ul, .guide-tips ul {
+    padding-left: 20px;
+    margin-bottom: 20px;
+}
+
+.about-text li, .guide-tips li {
+    margin-bottom: 8px;
+    color: var(--text-color);
+    opacity: 0.9;
+    line-height: 1.5;
+}
+
+.contact-info {
+    background: var(--light);
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 20px;
+    border: 1px solid var(--border-color);
+}
+
+.contact-info p {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-color);
+}
+
+.guide-step {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 25px;
+    padding-bottom: 25px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.guide-step:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.guide-step .step-number {
+    width: 30px;
+    height: 30px;
+    background: var(--secondary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-right: 15px;
+    flex-shrink: 0;
+}
+
+.step-content h4 {
+    color: var(--text-color);
+    margin-bottom: 5px;
+}
+
+.step-content p {
+    color: var(--text-color);
+    opacity: 0.9;
+    line-height: 1.5;
+}
+
+.guide-tips {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Profile Tab Styles */
+.profile-content {
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.profile-summary h3 {
+    color: var(--secondary);
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+}
+
+.profile-stats {
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+}
+
+.profile-stats h3 {
+    color: var(--text-color);
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+}
+
+
+/* Dark mode fixes for settings */
+[data-theme="dark"] .settings-header h2,
+[data-theme="dark"] .settings-header p,
+[data-theme="dark"] .setting-group h3,
+[data-theme="dark"] .setting-group p,
+[data-theme="dark"] .theme-option span,
+[data-theme="dark"] .toggle-label span:first-child,
+[data-theme="dark"] .about-text p,
+[data-theme="dark"] .about-text h4,
+[data-theme="dark"] .about-text li,
+[data-theme="dark"] .guide-content h4,
+[data-theme="dark"] .guide-content p,
+[data-theme="dark"] .guide-content li,
+[data-theme="dark"] .step-content h4,
+[data-theme="dark"] .step-content p {
+    color: var(--text-color) !important;
+}
+
+[data-theme="dark"] .toggle-slider {
+    background: #7f8c8d;
+}
+
+[data-theme="dark"] input:checked + .toggle-slider {
+    background: var(--secondary);
+}
+
+[data-theme="dark"] .contact-info {
+    background: var(--light);
+}
+
+[data-theme="dark"] .tab-btn {
+    color: var(--text-color);
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .tab-btn.active {
+    color: var(--secondary);
+    border-bottom-color: var(--secondary);
+}
+
+@media (max-width: 768px) {
+    .theme-options {
+        grid-template-columns: 1fr;
+    }
+    
+    .settings-tabs {
+        flex-direction: column;
+    }
+    
+    .tab-btn {
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+        border-left: 2px solid transparent;
+    }
+    
+    .tab-btn.active {
+        border-left-color: var(--secondary);
+        border-bottom-color: var(--border-color);
+    }
+}

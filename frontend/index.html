@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="js/api.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CivicBridge - Connecting citizens and authorities</title>
+    
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/auth.css">
+    <link rel="stylesheet" href="styles/dashboard.css">
+    <link rel="stylesheet" href="styles/settings.css">
+    <link rel="stylesheet" href="styles/report.css">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDtfv0zhVbOx-RfpQ3xFVKOiVrQjNfyF40&libraries=places"></script>
+</head>
+<body>
+    <div id="preloader" class="preloader">
+        <div class="preloader-content">
+            <i class="fas fa-city preloader-icon"></i>
+            <h1>CivicBridge</h1>
+            <p>Powered by <strong>ImpactX</strong></p>
+        </div>
+    </div>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-city"></i>
+                    <h1>CivicBridge</h1>
+                </div>
+                <nav>
+                    <ul>
+                        <li><a href="#home">Home</a></li>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#how-it-works">How It Works</a></li>
+                        <li><a href="#interactive-map"><i class="fas fa-map"></i> Map</a></li>
+                        <li><a href="#dashboard">Dashboard</a></li>
+                    </ul>
+                </nav>
+                <div class="header-actions">
+                    <button class="btn btn-icon" id="settingsBtn" title="Settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <div class="auth-buttons" id="authButtons">
+                        </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero" id="home">
+            <div class="hero-overlay"></div>
+            <div class="container">
+                <div class="hero-content">
+                    <h2>Make Your Community Better, Together</h2>
+                    <p>Report, track, and resolve civic issues in your neighborhood with our transparent platform.</p>
+                    <div class="hero-buttons">
+                        <button class="btn btn-primary btn-large" id="reportIssueBtn">Report an Issue</button> 
+                        <button class="btn btn-outline btn-large" id="viewDashboardBtn">View Dashboard</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="features" id="features">
+            <div class="container">
+                <div class="section-title">
+                    <h2>How CivicBridge Works</h2>
+                    <p>Our platform makes it easy to report issues and track their resolution</p>
+                </div>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <h3>Pinpoint Location</h3>
+                        <p>Use our integrated map to precisely mark the location of issues in your neighborhood.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                        <h3>Photo Evidence</h3>
+                        <p>Upload photos to provide clear evidence of the problem for faster resolution.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h3>Track Progress</h3>
+                        <p>Monitor the status of your reports from submission to resolution in real-time.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-bell"></i>
+                        </div>
+                        <h3>Get Notified</h3>
+                        <p>Receive updates when your reported issues change status or get resolved.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="stats-section">
+            <div class="container">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number">1,250+</div>
+                        <div class="stat-label">Issues Reported</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">89%</div>
+                        <div class="stat-label">Resolution Rate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">24h</div>
+                        <div class="stat-label">Average Response Time</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">15+</div>
+                        <div class="stat-label">Communities Served</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="how-it-works" id="how-it-works">
+            <div class="container">
+                <div class="section-title">
+                    <h2>Get Started in 3 Simple Steps</h2>
+                    <p>Join thousands of citizens making their communities better</p>
+                </div>
+                <div class="steps-grid">
+                    <div class="step-card">
+                        <div class="step-number">1</div>
+                        <h3>Sign Up</h3>
+                        <p>Create your free account in less than a minute</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">2</div>
+                        <h3>Report Issues</h3>
+                        <p>Take photos and pinpoint locations on our map</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">3</div>
+                        <h3>Track Progress</h3>
+                        <p>Get updates and see when issues are resolved</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="map-section" id="interactive-map">
+            <div class="container">
+                <div class="section-title">
+                    <h2>Community Issues Map</h2>
+                    <p>See reported issues in your neighborhood and track their progress</p>
+                </div>
+                <div class="map-container">
+                    <div id="communityMap"></div>
+                    <div class="map-controls">
+                        <button class="btn btn-primary" id="showReportModal">
+                            <i class="fas fa-plus"></i> Report New Issue
+                        </button>
+                        <button class="btn btn-outline" id="useMyLocation">
+                            <i class="fas fa-location-arrow"></i> Use My Location
+                        </button>
+                    </div>
+                    <div class="map-legend">
+                        <h4>Issue Status</h4>
+                        <div class="legend-items">
+                            <div class="legend-item">
+                                <span class="legend-color pending"></span>
+                                <span>Pending</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-color in-progress"></span>
+                                <span>In Progress</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-color resolved"></span>
+                                <span>Resolved</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="dashboard-section" id="dashboard">
+            </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-column">
+                    <h3>CivicBridge</h3>
+                    <p>Transparent civic issue reporting and tracking platform for better communities.</p>
+                </div>
+                <div class="footer-column">
+                    <h3>Quick Links</h3>
+                    <ul>
+                        <li><a href="#home">Home</a></li>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#how-it-works">How It Works</a></li>
+                        <li><a href="#interactive-map">Map</a></li>
+                        <li><a href="#dashboard">Dashboard</a></li>
+                    </ul>
+                </div>
+                <div class="footer-column">
+                    <h3>Developed By</h3>
+                    <ul>
+                        <li>Laxmi-22R91A05B4</li>
+                        <li>Bhavana-22R91A0582</li>
+                        <li>Tilak-22R91A05A4</li>
+                        <li>Vignesh-22R91A05A0</li>
+                    </ul>
+                    <p style="margin-top: 10px;">by Team ImpactX</p>
+                </div>
+                </div>
+            <div class="footer-bottom">
+                <p>&copy; 2023 CivicBridge. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div class="login-header">
+                <h2>Login to Your Account</h2>
+                <p>Access your reports and track issue status</p>
+            </div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" class="form-control" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" class="form-control" placeholder="Enter your password" required>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary btn-large" style="width: 100%;">Login</button>
+                </div>
+            </form>
+            <div class="login-footer">
+                <p>Don't have an account? <a href="#" id="showSignupModal">Sign up here</a></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="signupModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div class="login-header">
+                <h2>Create an Account</h2>
+                <p>Join CivicBridge to report and track issues</p>
+            </div>
+            <form id="signupForm">
+                <div class="form-group">
+                    <label for="fullName">Full Name</label>
+                    <input type="text" id="fullName" class="form-control" placeholder="Enter your full name" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupEmail">Email Address</label>
+                    <input type="email" id="signupEmail" class="form-control" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Password</label>
+                    <input type="password" id="signupPassword" class="form-control" placeholder="Create a password" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input type="password" id="confirmPassword" class="form-control" placeholder="Confirm your password" required>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary btn-large" style="width: 100%;">Sign Up</button>
+                </div>
+            </form>
+            <div class="login-footer">
+                <p>Already have an account? <a href="#" id="showLoginModal">Login here</a></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="reportModal" class="modal">
+        <div class="modal-content large-modal">
+            <span class="close">&times;</span>
+            <div class="login-header">
+                <h2><i class="fas fa-map-marker-alt"></i> Report an Issue</h2>
+                <p>Help us improve your community by reporting issues</p>
+            </div>
+            
+            <form id="reportForm">
+                <div class="form-group">
+                    <label for="issueType">Issue Type</label>
+                    <select id="issueType" class="form-control" required>
+                        <option value="">Select issue type</option>
+                        <option value="pothole">Pothole</option>
+                        <option value="streetlight">Streetlight Outage</option>
+                        <option value="garbage">Garbage Accumulation</option>
+                        <option value="graffiti">Graffiti</option>
+                        <option value="water_leak">Water Leak</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="issueDescription">Description</label>
+                    <textarea id="issueDescription" class="form-control" placeholder="Please describe the issue in detail..." rows="3" required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="locationSearch">Search Location</label>
+                    <div class="search-container">
+                        <input type="text" id="locationSearch" class="form-control" placeholder="Search for address or place...">
+                        <button type="button" id="currentLocationBtn" class="btn btn-outline location-btn" title="Use current location (from map section)">
+                            <i class="fas fa-location-arrow"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Pinpoint Location on Map</label>
+                    <button type="button" class="btn btn-secondary btn-full-width" id="findLiveLocationBtn" style="margin-bottom: 10px;">
+                        <i class="fas fa-crosshairs"></i> Find My Live Location
+                    </button>
+                    <div id="mapContainer">
+                        <div id="map"></div>
+                        <div class="map-overlay">
+                            <div class="map-instructions">
+                                <i class="fas fa-crosshairs"></i>
+                                <span>Click on the map to mark the exact location</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="coordinates-display">
+                        <span id="coordinates">Lat: 0.0000, Lng: 0.0000</span>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="photoUpload">Upload Photos (Optional)</label>
+                    <div class="upload-container">
+                        <input type="file" id="photoUpload" accept="image/*" multiple>
+                        <div class="upload-preview" id="photoPreview">
+                            <div class="upload-placeholder">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <span>Click to upload photos</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" id="cancelReport">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Submit Report</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div class="settings-header">
+                <h2><i class="fas fa-cog"></i> Settings</h2>
+                <p>Customize your CivicBridge experience</p>
+            </div>
+            
+            <div class="settings-tabs">
+                <button class="tab-btn active" data-tab="theme">Theme</button>
+                <button class="tab-btn" data-tab="profile">Profile</button> <button class="tab-btn" data-tab="about">About App</button>
+                <button class="tab-btn" data-tab="guide">App Guide</button>
+            </div>
+            
+            <div class="tab-content">
+                <div id="theme-tab" class="tab-pane active">
+                    <div class="setting-group">
+                        <h3>Appearance</h3>
+                        <p>Choose how CivicBridge looks</p>
+                        
+                        <div class="theme-options">
+                            <div class="theme-option" data-theme="light">
+                                <div class="theme-preview light-theme">
+                                    <div class="preview-header"></div>
+                                    <div class="preview-content">
+                                        <div class="preview-card"></div>
+                                        <div class="preview-card"></div>
+                                    </div>
+                                </div>
+                                <span>Light</span>
+                            </div>
+                            
+                            <div class="theme-option" data-theme="dark">
+                                <div class="theme-preview dark-theme">
+                                    <div class="preview-header"></div>
+                                    <div class="preview-content">
+                                        <div class="preview-card"></div>
+                                        <div class="preview-card"></div>
+                                    </div>
+                                </div>
+                                <span>Dark</span>
+                            </div>
+                            
+                            <div class="theme-option" data-theme="auto">
+                                <div class="theme-preview auto-theme">
+                                    <div class="preview-header"></div>
+                                    <div class="preview-content">
+                                        <div class="preview-card"></div>
+                                        <div class="preview-card"></div>
+                                    </div>
+                                </div>
+                                <span>Auto</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="setting-group">
+                        <h3>Notifications</h3>
+                        <div class="toggle-setting">
+                            <label class="toggle-label">
+                                <span>Push Notifications</span>
+                                <input type="checkbox" id="pushNotifications" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="toggle-setting">
+                            <label class="toggle-label">
+                                <span>Email Updates</span>
+                                <input type="checkbox" id="emailUpdates" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="profile-tab" class="tab-pane">
+                    <div class="profile-content">
+                        <div class="profile-summary">
+                            <h3><i class="fas fa-user-circle"></i> Account Summary</h3>
+                            <div id="profileInfo">
+                                <p>Please log in to view your profile details.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="profile-actions setting-group" style="margin-top: 25px;">
+                            <h3>Data Management</h3>
+                            <button class="btn btn-primary" onclick="window.showProfileDetails()">
+                                <i class="fas fa-sync-alt"></i> Refresh Data
+                            </button>
+                            <button class="btn btn-outline" disabled>
+                                <i class="fas fa-file-export"></i> Export Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="about-tab" class="tab-pane">
+                    <div class="about-content">
+                        <div class="app-info">
+                            <div class="app-icon">
+                                <i class="fas fa-city"></i>
+                            </div>
+                            <h3>CivicBridge</h3>
+                            <p class="version">Version 2.1.0</p>
+                        </div>
+                        
+                        <div class="about-text">
+                            <p>CivicBridge is a community-driven platform that empowers citizens to report, track, and resolve civic issues in their neighborhoods.</p>
+                            
+                            <h4>Our Mission</h4>
+                            <p>To create transparent, efficient communication between citizens and local authorities, making communities better places to live.</p>
+                            
+                            <h4>Features</h4>
+                            <ul>
+                                <li>Real-time issue reporting with photo evidence</li>
+                                <li>Interactive map integration</li>
+                                <li>Transparent status tracking</li>
+                                <li>Push notifications</li>
+                                <li>Public dashboard for community awareness</li>
+                            </ul>
+                            
+                            <div class="contact-info">
+                                <h4>Contact & Support</h4>
+                                <p><i class="fas fa-envelope"></i> ImpactX@gmail.com</p>
+                                <p><i class="fas fa-phone"></i> +91 1800 123 123</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="guide-tab" class="tab-pane">
+                    <div class="guide-content">
+                        <div class="guide-step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <h4>Create Your Account</h4>
+                                <p>Sign up for a free account using your email address. Verification may be required.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="guide-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <h4>Report an Issue</h4>
+                                <p>Click "Report an Issue", select the problem type, add photos, and pinpoint the location on the map.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="guide-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <h4>Track Progress</h4>
+                                <p>Monitor your reported issues in the dashboard. Status updates will show as Pending, In Progress, or Resolved.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="guide-step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <h4>Get Notified</h4>
+                                <p>Receive push notifications or emails when your issue status changes or gets resolved.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="guide-tips">
+                            <h4>Tips for Effective Reporting</h4>
+                            <ul>
+                                <li>Take clear, well-lit photos of the issue</li>
+                                <li>Be specific about the location</li>
+                                <li>Provide detailed descriptions</li>
+                                <li>Check similar existing reports first</li>
+                                <li>Follow up if issue isn't resolved in timely manner</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/report.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/settings.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/chatbot.js"></script> <script>
+        // Google Sheets Service
+        class GoogleSheetsService {
+            constructor() {
+                // Replace with your actual Google Apps Script URL
+                this.baseUrl = 'https://script.google.com/macros/s/AKfycbwGCcEher0aOJ68Vf3OHViwmLsqzahu1yWtnrhf4HK16S5AufP1VE0z-fKlKBCgo6B6/exec';
+            }
+
+            async makeRequest(data) {
+                try {
+                    const response = await fetch(this.baseUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    return await response.json();
+                } catch (error) {
+                    console.error('API Request failed:', error);
+                    return { success: false, error: 'Network error' };
+                }
+            }
+
+            async saveUser(userData) {
+                return await this.makeRequest({
+                    action: 'saveUser',
+                    ...userData
+                });
+            }
+
+            async saveReport(reportData) {
+                return await this.makeRequest({
+                    action: 'saveReport',
+                    ...reportData
+                });
+            }
+
+            async getUser(email, password) {
+                return await this.makeRequest({
+                    action: 'getUser',
+                    email: email,
+                    password: password
+                    });
+            }
+
+            async getUserReports(email) {
+                try {
+                    const response = await fetch(`${this.baseUrl}?action=getUserReports&email=${encodeURIComponent(email)}`);
+                    return await response.json();
+                } catch (error) {
+                    console.error('Error fetching user reports:', error);
+                    return { success: false, error: 'Network error' };
+                }
+            }
+
+            async getAllReports() {
+                try {
+                    const response = await fetch(`${this.baseUrl}?action=getAllReports`);
+                    return await response.json();
+                } catch (error) {
+                    console.error('Error fetching all reports:', error);
+                    return { success: false, error: 'Network error' };
+                }
+            }
+
+            async updateReportStatus(reportId, status, adminComment = '', updatedBy = '') {
+                return await this.makeRequest({
+                    action: 'updateReportStatus',
+                    reportId: reportId,
+                    status: status,
+                    adminComment: adminComment,
+                    adminCommentTimestamp: new Date().toISOString(),
+                    updatedBy: updatedBy
+                });
+            }
+        }
+
+        // Initialize Google Sheets Service
+        const sheetsService = new GoogleSheetsService();
+        window.sheetsService = sheetsService;
+    </script>
+</body>
+</html>
