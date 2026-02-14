@@ -192,7 +192,7 @@ class ReportManager {
         }
     }
 
-    handleReportSubmit(e) {
+    async handleReportSubmit(e) {
         e.preventDefault();
         
         if (!this.validateForm()) {
@@ -206,8 +206,10 @@ class ReportManager {
             submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
             submitButton.disabled = true;
 
-            // Simulate API call and save
-            this.saveReport().then(() => {
+            // Call saveReport and wait for it
+            const result = await this.saveReport();
+            
+            if (result) {
                 showAlert('Issue reported successfully!', 'success');
                 this.closeReportModal();
                 this.resetReportForm();
@@ -215,17 +217,12 @@ class ReportManager {
                 if (typeof loadDashboard === 'function') {
                     loadDashboard();
                 }
-            }).catch((error) => {
-                console.error('Error submitting report:', error);
-                showAlert('Failed to submit report. Please try again.', 'error');
-            }).finally(() => {
-                submitButton.innerHTML = originalText;
-                submitButton.disabled = false;
-            });
+            }
             
         } catch (error) {
             console.error('Critical error submitting report:', error);
             showAlert('Failed to submit report. Please try again.', 'error');
+        } finally {
             submitButton.innerHTML = originalText;
             submitButton.disabled = false;
         }
@@ -255,14 +252,17 @@ class ReportManager {
     }
 
     async saveReport() {
+        const userId = localStorage.getItem('userId');
         const userEmail = localStorage.getItem('userEmail');
         const userName = localStorage.getItem('userName');
         
-        const formData = {
-            id: Date.now(),
-            userId: userEmail,
-            userName: userName,
-            userEmail: userEmail,
+        if (!userId) {
+            showAlert('Please log in first', 'error');
+            return false;
+        }
+        
+        const reportData = {
+            userId: userId,
             issueType: document.getElementById('issueType').value,
             description: document.getElementById('issueDescription').value,
             location: this.selectedLocation ? {
@@ -270,31 +270,28 @@ class ReportManager {
                 lng: this.selectedLocation.lng()
             } : null,
             address: document.getElementById('locationSearch').value || 'Manual location',
-            photos: this.uploadedPhotos,
-            timestamp: new Date().toISOString(),
-            status: 'pending'
+            photos: this.uploadedPhotos
         };
 
         try {
-            // Save to Google Sheets
-            const saveResult = await sheetsService.saveReport(formData);
+            showAlert('Saving report...', 'info');
             
-            if (!saveResult.success) {
-                console.warn('Failed to save report to Google Sheets. Saving locally only.', saveResult.error);
-                showAlert('Report submitted, but online database save failed. Data may be lost on refresh.', 'warning');
+            // Save to backend API
+            const result = await apiService.createReport(reportData);
+            
+            if (result.success) {
+                showAlert('Report submitted successfully!', 'success');
+                return true;
+            } else {
+                showAlert(result.error || 'Failed to save report', 'error');
+                return false;
             }
             
         } catch (error) {
-            console.error('Error communicating with Google Sheets:', error);
-            showAlert('Report submitted, but online database communication failed. Data may be lost on refresh.', 'warning');
-        } finally {
-             // Always save to localStorage as cache/fallback
-            const existingReports = JSON.parse(localStorage.getItem('CivicBridge_reports') || '[]');
-            existingReports.push(formData);
-            localStorage.setItem('CivicBridge_reports', JSON.stringify(existingReports));
+            console.error('Error saving report:', error);
+            showAlert('An error occurred while saving the report', 'error');
+            return false;
         }
-        
-        return true;
     }
 
     handlePhotoUpload(event) {
