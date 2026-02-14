@@ -189,30 +189,51 @@ function initializeDashboard() {
 
 async function getUserIssues() {
     const userId = localStorage.getItem('userId');
-    if (!userId) return [];
+    console.log('getUserIssues called with userId:', userId);
+    
+    if (!userId) {
+        console.warn('No userId found in localStorage');
+        return [];
+    }
 
     try {
         // Fetch user reports from backend API
+        console.log('Fetching reports from API for user:', userId);
         const result = await apiService.getUserReports(userId);
         
+        console.log('API response:', result);
+        
         if (result.success && result.reports) {
-            return result.reports.map(report => ({
-                id: report.id,
-                type: report.issueType,
-                title: `${report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General'} Issue`,
-                description: report.description,
-                status: report.status || 'pending',
-                date: report.timestamp ? new Date(report.timestamp).toLocaleDateString() : new Date().toLocaleDateString(),
-                location: report.address || 'Location not specified',
-                comments: report.comments || [],
-                photos: report.photos || []
-            }));
+            console.log(`Received ${result.reports.length} reports`);
+            
+            return result.reports.map(report => {
+                // Normalize status field
+                let normalizedStatus = (report.status || 'pending').toLowerCase();
+                if (normalizedStatus === 'in_progress') {
+                    normalizedStatus = 'in-progress';
+                }
+                
+                return {
+                    id: report.id,
+                    type: report.issueType,
+                    title: `${report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General'} Issue`,
+                    description: report.description,
+                    status: normalizedStatus,
+                    date: report.timestamp ? new Date(report.timestamp).toLocaleDateString() : new Date().toLocaleDateString(),
+                    location: report.address || 'Location not specified',
+                    comments: report.comments || [],
+                    photos: report.photos || []
+                };
+            });
+        } else {
+            console.warn('API returned success=false or no reports:', result);
+            return [];
         }
     } catch (error) {
         console.error('Error fetching user reports:', error);
+        showAlert('Failed to load your reports. Please refresh.', 'error');
+        return [];
     }
-    
-    return [];
 }
 
 function renderIssuesList(issues) {
