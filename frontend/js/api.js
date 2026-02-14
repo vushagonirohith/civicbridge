@@ -1,5 +1,5 @@
 // API Service - Handles all backend communication
-const API_BASE = 'https://civicbridge-backend.onrender.com/api';
+const API_BASE = 'https://civicbridge.onrender.com/api';
 
 const apiService = {
     // ============= AUTH =============
