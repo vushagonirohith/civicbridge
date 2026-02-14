@@ -137,37 +137,82 @@ def create_report():
     """Create a new report"""
     try:
         data = request.json
+        print(f"Creating report with data: {data}")
+        
         user_id = data.get('userId')
+        
+        if not user_id:
+            print("ERROR: No userId provided")
+            return jsonify({'success': False, 'error': 'User ID required'}), 400
         
         # Insert report
         report_data = {
             'user_id': user_id,
             'issue_type': data.get('issueType'),
             'description': data.get('description'),
-            'latitude': data.get('location', {}).get('lat'),
-            'longitude': data.get('location', {}).get('lng'),
+            'latitude': data.get('location', {}).get('lat') if data.get('location') else None,
+            'longitude': data.get('location', {}).get('lng') if data.get('location') else None,
             'address': data.get('address'),
             'status': 'pending'
         }
         
+        print(f"Report data to insert: {report_data}")
+        
         response = supabase.table('reports').insert(report_data).execute()
+        print(f"Supabase response: {response.data}")
+        
         report_id = response.data[0]['id']
         
-        # Insert photos if any
+        # Insert photos if any - Upload to Supabase Storage
         photos = data.get('photos', [])
+        photo_urls = []
         if photos:
-            for photo in photos:
+            print(f"Uploading {len(photos)} photos to storage")
+            for idx, photo_data in enumerate(photos):
+                try:
+                    # Remove data:image/jpeg;base64, prefix if present
+                    if ',' in photo_data:
+                        photo_data = photo_data.split(',')[1]
+                    
+                    # Decode base64 to bytes
+                    photo_bytes = base64.b64decode(photo_data)
+                    
+                    # Create filename
+                    filename = f"{report_id}/photo_{idx}_{int(datetime.now().timestamp())}.jpg"
+                    
+                    # Upload to Supabase Storage
+                    response = supabase.storage.from_('report-photos').upload(
+                        filename,
+                        photo_bytes,
+                        {'content-type': 'image/jpeg'}
+                    )
+                    
+                    # Get public URL
+                    public_url = supabase.storage.from_('report-photos').get_public_url(filename)
+                    photo_urls.append(public_url)
+                    
+                    print(f"Photo {idx} uploaded: {public_url}")
+                    
+                except Exception as photo_error:
+                    print(f"Error uploading photo {idx}: {str(photo_error)}")
+            
+            # Store photo URLs in database (not the images)
+            for photo_url in photo_urls:
                 supabase.table('report_photos').insert({
                     'report_id': report_id,
-                    'photo_data': photo
+                    'photo_data': photo_url  # Now just the URL, not base64
                 }).execute()
         
+        print(f"Report created successfully with ID: {report_id}")
         return jsonify({
             'success': True,
             'reportId': report_id
         }), 201
     
     except Exception as e:
+        print(f"ERROR creating report: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/reports/user/<user_id>', methods=['GET'])

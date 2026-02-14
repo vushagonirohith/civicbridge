@@ -295,21 +295,36 @@ class ReportManager {
     }
 
     handlePhotoUpload(event) {
-        const files = Array.from(event.target.files).slice(0, 5);
+        const files = Array.from(event.target.files);
         const preview = document.getElementById('photoPreview');
+        const maxSizePerFile = 10 * 1024 * 1024; // 10MB per file
+        const maxTotal = 50 * 1024 * 1024; // 50MB total
 
         if (!preview) return;
 
-        preview.innerHTML = '';
-        this.uploadedPhotos = [];
+        // Check total size
+        const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+        if (totalSize > maxTotal) {
+            showAlert('Total file size exceeds 50MB limit', 'error');
+            return;
+        }
 
-        if (files.length === 0) {
+        // Check individual file sizes
+        const oversized = files.filter(f => f.size > maxSizePerFile);
+        if (oversized.length > 0) {
+            showAlert(`Some files exceed 10MB limit. Max: ${oversized.length} file(s)`, 'error');
+            return;
+        }
+
+        const validFiles = files.slice(0, 5); // Max 5 files
+
+        if (validFiles.length === 0) {
             this.showUploadPlaceholder();
             return;
         }
 
         // Read all files asynchronously
-        const fileReaders = files.map(file => {
+        const fileReaders = validFiles.map(file => {
             return new Promise((resolve, reject) => {
                 if (!file.type.startsWith('image/')) return reject('Invalid file type');
 
@@ -323,6 +338,7 @@ class ReportManager {
         Promise.all(fileReaders)
             .then(results => {
                 this.uploadedPhotos = results;
+                preview.innerHTML = '';
                 results.forEach(photo => this.addPhotoToPreview(photo));
                 this.attachPhotoPreviewListener();
             })
