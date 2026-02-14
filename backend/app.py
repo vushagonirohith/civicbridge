@@ -11,13 +11,20 @@ from datetime import datetime
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, resources={
-    r"/api/*": {
-        "origins": ["https://civicbridge-1.onrender.com", "http://localhost:8000", "http://localhost:5000"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
-    }
-})
+# Allow CORS for all origins during development
+CORS(app, 
+     origins=["*"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+     allow_headers=["Content-Type", "Authorization"])
+
+# Alternatively, uncomment below for production with specific origins
+# CORS(app, resources={
+#     r"/api/*": {
+#         "origins": ["https://civicbridge-1.onrender.com", "http://localhost:8000"],
+#         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+#         "allow_headers": ["Content-Type"]
+#     }
+# })
 
 # Supabase connection
 SUPABASE_URL = os.getenv('SUPABASE_URL')
@@ -282,6 +289,15 @@ def delete_report(report_id):
     
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# ============= MIDDLEWARE =============
+
+@app.before_request
+def log_request():
+    """Log all requests for debugging"""
+    print(f"[{request.method}] {request.path} from {request.remote_addr}")
+    if request.method in ['POST', 'PUT']:
+        print(f"  Body: {request.get_json()}")
 
 # ============= HEALTH CHECK =============
 
