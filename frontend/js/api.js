@@ -2,8 +2,9 @@
 const API_BASE = 'https://civicbridge.onrender.com/api';
 
 const apiService = {
+
     // ============= AUTH =============
-    
+
     async signup(email, name, password) {
         try {
             const response = await fetch(`${API_BASE}/auth/signup`, {
@@ -32,12 +33,13 @@ const apiService = {
         }
     },
 
-    async adminLogin(username, password) {
+    // Admin login — now uses /api/admin/login (credentials stored in Render env vars)
+    async adminLogin(email, password) {
         try {
-            const response = await fetch(`${API_BASE}/auth/admin-login`, {
+            const response = await fetch(`${API_BASE}/admin/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ email, password })
             });
             return await response.json();
         } catch (error) {

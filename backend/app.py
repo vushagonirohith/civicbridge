@@ -4,29 +4,17 @@ from supabase import create_client, Client
 import os
 from dotenv import load_dotenv
 import hashlib
-import json
+import base64  # ← was missing, caused photo upload to crash
 from datetime import datetime
 
-# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
-# Allow CORS for all origins during development
-CORS(app, 
+CORS(app,
      origins=["*"],
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
      allow_headers=["Content-Type", "Authorization"])
 
-# Alternatively, uncomment below for production with specific origins
-# CORS(app, resources={
-#     r"/api/*": {
-#         "origins": ["https://civicbridge-1.onrender.com", "http://localhost:8000"],
-#         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-#         "allow_headers": ["Content-Type"]
-#     }
-# })
-
-# Supabase connection
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -35,63 +23,69 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 @app.route('/api/auth/signup', methods=['POST'])
 def signup():
-    """User signup"""
     try:
         data = request.json
-        email = data.get('email')
-        name = data.get('name')
-        password = data.get('password')
-        
+        email = data.get('email', '').strip().lower()
+        name = data.get('name', '').strip()
+        password = data.get('password', '')
+
         if not email or not name or not password:
             return jsonify({'success': False, 'error': 'Missing fields'}), 400
-        
-        # Hash password (simple)
+
+        if len(password) < 6:
+            return jsonify({'success': False, 'error': 'Password must be at least 6 characters'}), 400
+
         password_hash = hashlib.sha256(password.encode()).hexdigest()
-        
-        # Insert user into Supabase
+
+        # Check if email already exists
+        existing = supabase.table('users').select('id').eq('email', email).execute()
+        if existing.data:
+            return jsonify({'success': False, 'error': 'Email already registered'}), 409
+
         response = supabase.table('users').insert({
             'email': email,
             'name': name,
             'password_hash': password_hash,
             'role': 'user'
         }).execute()
-        
+
         return jsonify({
             'success': True,
             'user': {
                 'id': response.data[0]['id'],
                 'email': email,
-                'name': name
+                'name': name,
+                'role': 'user'
             }
         }), 201
-    
+
     except Exception as e:
+        print(f"Signup error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    """User login"""
     try:
         data = request.json
-        email = data.get('email')
-        password = data.get('password')
-        
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
+
         if not email or not password:
             return jsonify({'success': False, 'error': 'Missing fields'}), 400
-        
+
         password_hash = hashlib.sha256(password.encode()).hexdigest()
-        
-        # Find user in Supabase
+
         response = supabase.table('users').select('*').eq('email', email).execute()
-        
+
         if not response.data:
-            return jsonify({'success': False, 'error': 'User not found'}), 404
-        
+            return jsonify({'success': False, 'error': 'Invalid email or password'}), 401
+
         user = response.data[0]
-        
+
         if user['password_hash'] != password_hash:
-            return jsonify({'success': False, 'error': 'Wrong password'}), 401
-        
+            return jsonify({'success': False, 'error': 'Invalid email or password'}), 401
+
         return jsonify({
             'success': True,
             'user': {
@@ -101,51 +95,59 @@ def login():
                 'role': user['role']
             }
         }), 200
-    
+
     except Exception as e:
+        print(f"Login error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/auth/admin-login', methods=['POST'])
+
+@app.route('/api/admin/login', methods=['POST'])
 def admin_login():
-    """Admin login with hardcoded credentials"""
+    """
+    Admin login — reads admin credentials from environment variables.
+    Set ADMIN_EMAIL and ADMIN_PASSWORD in your Render env vars.
+    """
     try:
         data = request.json
-        username = data.get('username')
-        password = data.get('password')
-        
-        # Hardcoded admin credentials
-        if username == 'admin' and password == 'admin123':
-            return jsonify({
-                'success': True,
-                'user': {
-                    'id': 'admin-001',
-                    'email': 'admin@civicbridge.com',
-                    'name': 'Administrator',
-                    'role': 'admin'
-                }
-            }), 200
-        
-        return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
-    
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '')
+
+        admin_email = os.getenv('ADMIN_EMAIL', '').strip().lower()
+        admin_password = os.getenv('ADMIN_PASSWORD', '')
+
+        if not admin_email or not admin_password:
+            return jsonify({'success': False, 'error': 'Admin credentials not configured on server'}), 500
+
+        if email != admin_email or password != admin_password:
+            return jsonify({'success': False, 'error': 'Invalid admin credentials'}), 401
+
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': 'admin-001',
+                'email': admin_email,
+                'name': os.getenv('ADMIN_NAME', 'Administrator'),
+                'role': 'admin'
+            }
+        }), 200
+
     except Exception as e:
+        print(f"Admin login error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 # ============= REPORT ROUTES =============
 
 @app.route('/api/reports', methods=['POST'])
 def create_report():
-    """Create a new report"""
     try:
         data = request.json
-        print(f"Creating report with data: {data}")
-        
+        print(f"Creating report: {data}")
+
         user_id = data.get('userId')
-        
         if not user_id:
-            print("ERROR: No userId provided")
             return jsonify({'success': False, 'error': 'User ID required'}), 400
-        
-        # Insert report
+
         report_data = {
             'user_id': user_id,
             'issue_type': data.get('issueType'),
@@ -155,120 +157,100 @@ def create_report():
             'address': data.get('address'),
             'status': 'pending'
         }
-        
-        print(f"Report data to insert: {report_data}")
-        
+
         response = supabase.table('reports').insert(report_data).execute()
-        print(f"Supabase response: {response.data}")
-        
         report_id = response.data[0]['id']
-        
-        # Insert photos if any - Upload to Supabase Storage
+
+        # Upload photos to Supabase Storage
         photos = data.get('photos', [])
         photo_urls = []
         if photos:
-            print(f"Uploading {len(photos)} photos to storage")
-            for idx, photo_data in enumerate(photos):
+            print(f"Uploading {len(photos)} photos...")
+            for idx, photo_data in enumerate(photos[:5]):  # max 5
                 try:
-                    # Remove data:image/jpeg;base64, prefix if present
+                    # Strip base64 prefix if present
                     if ',' in photo_data:
                         photo_data = photo_data.split(',')[1]
-                    
-                    # Decode base64 to bytes
+
                     photo_bytes = base64.b64decode(photo_data)
-                    
-                    # Create filename
                     filename = f"{report_id}/photo_{idx}_{int(datetime.now().timestamp())}.jpg"
-                    
-                    # Upload to Supabase Storage
-                    response = supabase.storage.from_('report-photos').upload(
+
+                    supabase.storage.from_('report-photos').upload(
                         filename,
                         photo_bytes,
                         {'content-type': 'image/jpeg'}
                     )
-                    
-                    # Get public URL
+
                     public_url = supabase.storage.from_('report-photos').get_public_url(filename)
                     photo_urls.append(public_url)
-                    
                     print(f"Photo {idx} uploaded: {public_url}")
-                    
+
                 except Exception as photo_error:
-                    print(f"Error uploading photo {idx}: {str(photo_error)}")
-            
-            # Store photo URLs in database (not the images)
-            for photo_url in photo_urls:
+                    print(f"Photo {idx} upload failed: {photo_error}")
+
+            # Save photo URLs to DB
+            for url in photo_urls:
                 supabase.table('report_photos').insert({
                     'report_id': report_id,
-                    'photo_data': photo_url  # Now just the URL, not base64
+                    'photo_url': url
                 }).execute()
-        
-        print(f"Report created successfully with ID: {report_id}")
-        return jsonify({
-            'success': True,
-            'reportId': report_id
-        }), 201
-    
+
+        print(f"Report created: {report_id}")
+        return jsonify({'success': True, 'reportId': report_id}), 201
+
     except Exception as e:
-        print(f"ERROR creating report: {str(e)}")
+        print(f"Create report error: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
 @app.route('/api/reports/user/<user_id>', methods=['GET'])
 def get_user_reports(user_id):
-    """Get all reports by a user"""
     try:
-        response = supabase.table('reports').select('*').eq('user_id', user_id).execute()
-        
+        response = supabase.table('reports').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
+
         reports = []
         for report in response.data:
-            # Get photos for this report
             photos_response = supabase.table('report_photos').select('*').eq('report_id', report['id']).execute()
-            photos = [p['photo_data'] for p in photos_response.data]
-            
-            # Get comments for this report
-            comments_response = supabase.table('admin_comments').select('*').eq('report_id', report['id']).execute()
-            
+            photos = [p.get('photo_url') or p.get('photo_data', '') for p in photos_response.data]
+
+            comments_response = supabase.table('admin_comments').select('*').eq('report_id', report['id']).order('created_at', desc=False).execute()
+
             reports.append({
                 'id': report['id'],
                 'issueType': report['issue_type'],
                 'description': report['description'],
-                'location': {
-                    'lat': report['latitude'],
-                    'lng': report['longitude']
-                },
+                'location': {'lat': report['latitude'], 'lng': report['longitude']},
                 'address': report['address'],
                 'photos': photos,
                 'status': report['status'],
                 'comments': comments_response.data,
                 'timestamp': report['created_at']
             })
-        
+
         return jsonify({'success': True, 'reports': reports}), 200
-    
+
     except Exception as e:
+        print(f"Get user reports error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/api/reports', methods=['GET'])
 def get_all_reports():
-    """Get all reports (admin only)"""
     try:
-        response = supabase.table('reports').select('*').execute()
-        
+        response = supabase.table('reports').select('*').order('created_at', desc=True).execute()
+
         reports = []
         for report in response.data:
-            # Get user info
-            user_response = supabase.table('users').select('*').eq('id', report['user_id']).execute()
+            user_response = supabase.table('users').select('id, name, email').eq('id', report['user_id']).execute()
             user = user_response.data[0] if user_response.data else {}
-            
-            # Get photos
+
             photos_response = supabase.table('report_photos').select('*').eq('report_id', report['id']).execute()
-            photos = [p['photo_data'] for p in photos_response.data]
-            
-            # Get comments
-            comments_response = supabase.table('admin_comments').select('*').eq('report_id', report['id']).execute()
-            
+            photos = [p.get('photo_url') or p.get('photo_data', '') for p in photos_response.data]
+
+            comments_response = supabase.table('admin_comments').select('*').eq('report_id', report['id']).order('created_at', desc=False).execute()
+
             reports.append({
                 'id': report['id'],
                 'userId': report['user_id'],
@@ -276,80 +258,98 @@ def get_all_reports():
                 'userEmail': user.get('email', 'Unknown'),
                 'issueType': report['issue_type'],
                 'description': report['description'],
-                'location': {
-                    'lat': report['latitude'],
-                    'lng': report['longitude']
-                },
+                'location': {'lat': report['latitude'], 'lng': report['longitude']},
                 'address': report['address'],
                 'photos': photos,
                 'status': report['status'],
                 'comments': comments_response.data,
                 'timestamp': report['created_at']
             })
-        
+
         return jsonify({'success': True, 'reports': reports}), 200
-    
+
     except Exception as e:
+        print(f"Get all reports error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/api/reports/<report_id>/status', methods=['PUT'])
 def update_report_status(report_id):
-    """Update report status (admin only)"""
     try:
         data = request.json
         status = data.get('status')
-        
+        allowed = {'pending', 'in_progress', 'resolved'}
+        if status not in allowed:
+            return jsonify({'success': False, 'error': f'status must be one of {allowed}'}), 400
+
         supabase.table('reports').update({'status': status}).eq('id', report_id).execute()
-        
         return jsonify({'success': True}), 200
-    
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
 @app.route('/api/reports/<report_id>/comment', methods=['POST'])
 def add_comment(report_id):
-    """Add admin comment to report"""
     try:
         data = request.json
-        comment = data.get('comment')
+        comment = (data.get('comment') or '').strip()
+        if not comment:
+            return jsonify({'success': False, 'error': 'Comment cannot be empty'}), 400
+
         admin_id = data.get('adminId', 'admin-001')
-        
+
         supabase.table('admin_comments').insert({
             'report_id': report_id,
             'admin_id': admin_id,
             'comment_text': comment
         }).execute()
-        
+
         return jsonify({'success': True}), 201
-    
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/api/reports/<report_id>', methods=['DELETE'])
 def delete_report(report_id):
-    """Delete a report (admin only)"""
     try:
+        # Delete photos from storage first
+        photos_response = supabase.table('report_photos').select('photo_url').eq('report_id', report_id).execute()
+        for photo in photos_response.data:
+            url = photo.get('photo_url') or photo.get('photo_data', '')
+            if url and 'report-photos' in url:
+                try:
+                    # Extract path from URL
+                    path = url.split('/report-photos/')[1]
+                    supabase.storage.from_('report-photos').remove([path])
+                except Exception as e:
+                    print(f"Could not delete photo from storage: {e}")
+
+        # Delete related records
+        supabase.table('report_photos').delete().eq('report_id', report_id).execute()
+        supabase.table('admin_comments').delete().eq('report_id', report_id).execute()
         supabase.table('reports').delete().eq('id', report_id).execute()
+
         return jsonify({'success': True}), 200
-    
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# ============= MIDDLEWARE =============
-
-@app.before_request
-def log_request():
-    """Log all requests for debugging"""
-    print(f"[{request.method}] {request.path} from {request.remote_addr}")
-    if request.method in ['POST', 'PUT']:
-        print(f"  Body: {request.get_json()}")
 
 # ============= HEALTH CHECK =============
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Check if backend is running"""
-    return jsonify({'status': 'ok'}), 200
+    return jsonify({'status': 'ok', 'timestamp': datetime.utcnow().isoformat()}), 200
+
+
+# ============= MIDDLEWARE =============
+
+@app.before_request
+def log_request():
+    print(f"[{request.method}] {request.path}")
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

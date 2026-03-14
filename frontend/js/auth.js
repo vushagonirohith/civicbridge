@@ -3,30 +3,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const loginForm = document.getElementById('loginForm');
     const signupForm = document.getElementById('signupForm');
 
-    if (loginForm) {
-        loginForm.addEventListener('submit', handleLogin);
-    }
+    if (loginForm) loginForm.addEventListener('submit', handleLogin);
+    if (signupForm) signupForm.addEventListener('submit', handleSignup);
 
-    if (signupForm) {
-        signupForm.addEventListener('submit', handleSignup);
-    }
-
-    // Admin login listener
     document.getElementById('adminLoginBtn')?.addEventListener('click', openAdminLoginModal);
 });
-
-// Admin credentials (for admin panel modal)
-const ADMIN_CREDENTIALS = {
-    username: 'admin',
-    password: 'admin123',
-    email: 'admin@CivicBridge.com'
-};
 
 function openAdminLoginModal() {
     if (!document.getElementById('adminLoginModal')) {
         createAdminLoginModal();
     }
-    
     document.getElementById('adminLoginModal').style.display = 'block';
     document.body.style.overflow = 'hidden';
 }
@@ -44,8 +30,8 @@ function createAdminLoginModal() {
             </div>
             <form id="adminLoginForm">
                 <div class="form-group">
-                    <label for="adminUsername">Username</label>
-                    <input type="text" id="adminUsername" class="form-control" placeholder="Enter admin username" required>
+                    <label for="adminEmail">Email</label>
+                    <input type="email" id="adminEmail" class="form-control" placeholder="Enter admin email" required>
                 </div>
                 <div class="form-group">
                     <label for="adminPassword">Password</label>
@@ -62,17 +48,16 @@ function createAdminLoginModal() {
             </div>
         </div>
     `;
-    
+
     document.body.appendChild(adminModal);
-    
-    // Add event listeners
+
     adminModal.querySelector('.close').addEventListener('click', () => {
         adminModal.style.display = 'none';
         document.body.style.overflow = 'auto';
     });
-    
+
     adminModal.querySelector('#adminLoginForm').addEventListener('submit', handleAdminLogin);
-    
+
     adminModal.addEventListener('click', (e) => {
         if (e.target === adminModal) {
             adminModal.style.display = 'none';
@@ -81,48 +66,44 @@ function createAdminLoginModal() {
     });
 }
 
-// UPDATED: Admin login using backend API
 async function handleAdminLogin(e) {
     e.preventDefault();
-    
-    const username = document.getElementById('adminUsername').value;
+
+    const email = document.getElementById('adminEmail').value.trim().toLowerCase();
     const password = document.getElementById('adminPassword').value;
-    
-    if (!username || !password) {
-        showAlert('Please enter both username and password', 'error');
+
+    if (!email || !password) {
+        showAlert('Please enter email and password', 'error');
         return;
     }
 
     try {
         showAlert('Authenticating admin...', 'info');
-        
-        // Call backend API
-        const result = await apiService.adminLogin(username, password);
-        
+
+        const result = await apiService.adminLogin(email, password);
+
         if (result.success) {
             const user = result.user;
-            
-            // Save to localStorage
+
             localStorage.setItem('adminToken', 'admin-token-' + Date.now());
-            localStorage.setItem('adminUser', username);
+            localStorage.setItem('adminUser', user.name);
             localStorage.setItem('userRole', 'admin');
-            localStorage.setItem('authToken', 'auth-token-' + Date.now());
+            localStorage.setItem('authToken', 'admin-token-' + Date.now());
             localStorage.setItem('userEmail', user.email);
             localStorage.setItem('userName', user.name);
             localStorage.setItem('userId', user.id);
             localStorage.setItem('currentUser', JSON.stringify(user));
-            
+
             showAlert('Admin login successful!', 'success');
             document.getElementById('adminLoginModal').style.display = 'none';
             document.body.style.overflow = 'auto';
-            
+
             updateAuthUI();
-            
-            // Load admin dashboard
+
             if (typeof loadAdminDashboard === 'function') {
                 loadAdminDashboard();
             }
-            
+
             e.target.reset();
         } else {
             showAlert(result.error || 'Invalid credentials', 'error');
@@ -133,25 +114,24 @@ async function handleAdminLogin(e) {
     }
 }
 
-// UPDATED: Regular user signup using backend API
 async function handleSignup(e) {
     e.preventDefault();
-    
-    const name = document.getElementById('fullName').value;
-    const email = document.getElementById('signupEmail').value;
+
+    const name = document.getElementById('fullName').value.trim();
+    const email = document.getElementById('signupEmail').value.trim().toLowerCase();
     const password = document.getElementById('signupPassword').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
-    
+
     if (!name || !email || !password || !confirmPassword) {
         showAlert('Please fill in all fields', 'error');
         return;
     }
-    
+
     if (password !== confirmPassword) {
         showAlert('Passwords do not match', 'error');
         return;
     }
-    
+
     if (password.length < 6) {
         showAlert('Password must be at least 6 characters', 'error');
         return;
@@ -159,21 +139,14 @@ async function handleSignup(e) {
 
     try {
         showAlert('Creating account...', 'info');
-        
-        // Call backend API
+
         const result = await apiService.signup(email, name, password);
-        
+
         if (result.success) {
             showAlert('Account created successfully! Please log in.', 'success');
-            
-            // Clear signup form
             e.target.reset();
-            
-            // Close signup modal and show login modal
             document.getElementById('signupModal').style.display = 'none';
             document.getElementById('loginModal').style.display = 'block';
-            
-            // Pre-fill email in login form
             document.getElementById('email').value = email;
         } else {
             showAlert(result.error || 'Signup failed', 'error');
@@ -184,13 +157,12 @@ async function handleSignup(e) {
     }
 }
 
-// UPDATED: Regular user login using backend API
 async function handleLogin(e) {
     e.preventDefault();
-    
-    const email = document.getElementById('email').value;
+
+    const email = document.getElementById('email').value.trim().toLowerCase();
     const password = document.getElementById('password').value;
-    
+
     if (!email || !password) {
         showAlert('Please fill in all fields', 'error');
         return;
@@ -198,32 +170,29 @@ async function handleLogin(e) {
 
     try {
         showAlert('Logging in...', 'info');
-        
-        // Call backend API
+
         const result = await apiService.login(email, password);
-        
+
         if (result.success) {
             const user = result.user;
-            
-            // Save to localStorage
+
             localStorage.setItem('authToken', 'auth-token-' + Date.now());
             localStorage.setItem('userEmail', user.email);
             localStorage.setItem('userName', user.name);
             localStorage.setItem('userId', user.id);
             localStorage.setItem('userRole', user.role || 'user');
             localStorage.setItem('currentUser', JSON.stringify(user));
-            
+
             showAlert('Login successful!', 'success');
             document.getElementById('loginModal').style.display = 'none';
             document.body.style.overflow = 'auto';
-            
+
             updateAuthUI();
-            
-            // Load user dashboard
+
             if (typeof loadUserDashboard === 'function') {
                 loadUserDashboard();
             }
-            
+
             e.target.reset();
         } else {
             showAlert(result.error || 'Login failed', 'error');
@@ -234,22 +203,29 @@ async function handleLogin(e) {
     }
 }
 
-// Logout function
 function logout() {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('userEmail');
-    localStorage.removeItem('userName');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('adminToken');
-    localStorage.removeItem('adminUser');
-    localStorage.removeItem('currentUser');
-    
+    ['authToken', 'userEmail', 'userName', 'userId', 'userRole',
+     'adminToken', 'adminUser', 'currentUser'].forEach(k => localStorage.removeItem(k));
+
     showAlert('Logged out successfully', 'success');
     updateAuthUI();
-    
-    // Reload page
-    setTimeout(() => {
-        window.location.reload();
-    }, 1000);
+
+    setTimeout(() => window.location.reload(), 1000);
+}
+
+// Helpers used by other scripts
+function checkLoginStatus() {
+    return !!localStorage.getItem('authToken');
+}
+
+function isAdmin() {
+    return localStorage.getItem('userRole') === 'admin';
+}
+
+function getCurrentUser() {
+    try {
+        return JSON.parse(localStorage.getItem('currentUser') || '{}');
+    } catch (e) {
+        return {};
+    }
 }
