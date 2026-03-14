@@ -4,7 +4,7 @@ from supabase import create_client, Client
 import os
 from dotenv import load_dotenv
 import hashlib
-import base64  # ← was missing, caused photo upload to crash
+import base64
 from datetime import datetime
 
 load_dotenv()
@@ -16,8 +16,11 @@ CORS(app,
      allow_headers=["Content-Type", "Authorization"])
 
 SUPABASE_URL = os.getenv('SUPABASE_URL')
-SUPABASE_KEY = os.getenv('SUPABASE_KEY')
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+SUPABASE_KEY = os.getenv('SUPABASE_KEY')                          # anon key — DB queries
+SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY', SUPABASE_KEY)  # service role — Storage
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)             # for DB
+supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)  # for Storage uploads
 
 # ============= AUTH ROUTES =============
 
@@ -31,33 +34,23 @@ def signup():
 
         if not email or not name or not password:
             return jsonify({'success': False, 'error': 'Missing fields'}), 400
-
         if len(password) < 6:
             return jsonify({'success': False, 'error': 'Password must be at least 6 characters'}), 400
 
         password_hash = hashlib.sha256(password.encode()).hexdigest()
 
-        # Check if email already exists
         existing = supabase.table('users').select('id').eq('email', email).execute()
         if existing.data:
             return jsonify({'success': False, 'error': 'Email already registered'}), 409
 
         response = supabase.table('users').insert({
-            'email': email,
-            'name': name,
-            'password_hash': password_hash,
-            'role': 'user'
+            'email': email, 'name': name,
+            'password_hash': password_hash, 'role': 'user'
         }).execute()
 
-        return jsonify({
-            'success': True,
-            'user': {
-                'id': response.data[0]['id'],
-                'email': email,
-                'name': name,
-                'role': 'user'
-            }
-        }), 201
+        return jsonify({'success': True, 'user': {
+            'id': response.data[0]['id'], 'email': email, 'name': name, 'role': 'user'
+        }}), 201
 
     except Exception as e:
         print(f"Signup error: {e}")
@@ -75,26 +68,19 @@ def login():
             return jsonify({'success': False, 'error': 'Missing fields'}), 400
 
         password_hash = hashlib.sha256(password.encode()).hexdigest()
-
         response = supabase.table('users').select('*').eq('email', email).execute()
 
         if not response.data:
             return jsonify({'success': False, 'error': 'Invalid email or password'}), 401
 
         user = response.data[0]
-
         if user['password_hash'] != password_hash:
             return jsonify({'success': False, 'error': 'Invalid email or password'}), 401
 
-        return jsonify({
-            'success': True,
-            'user': {
-                'id': user['id'],
-                'email': user['email'],
-                'name': user['name'],
-                'role': user['role']
-            }
-        }), 200
+        return jsonify({'success': True, 'user': {
+            'id': user['id'], 'email': user['email'],
+            'name': user['name'], 'role': user['role']
+        }}), 200
 
     except Exception as e:
         print(f"Login error: {e}")
@@ -103,10 +89,6 @@ def login():
 
 @app.route('/api/admin/login', methods=['POST'])
 def admin_login():
-    """
-    Admin login — reads admin credentials from environment variables.
-    Set ADMIN_EMAIL and ADMIN_PASSWORD in your Render env vars.
-    """
     try:
         data = request.json
         email = data.get('email', '').strip().lower()
@@ -116,20 +98,14 @@ def admin_login():
         admin_password = os.getenv('ADMIN_PASSWORD', '')
 
         if not admin_email or not admin_password:
-            return jsonify({'success': False, 'error': 'Admin credentials not configured on server'}), 500
-
+            return jsonify({'success': False, 'error': 'Admin credentials not configured'}), 500
         if email != admin_email or password != admin_password:
             return jsonify({'success': False, 'error': 'Invalid admin credentials'}), 401
 
-        return jsonify({
-            'success': True,
-            'user': {
-                'id': 'admin-001',
-                'email': admin_email,
-                'name': os.getenv('ADMIN_NAME', 'Administrator'),
-                'role': 'admin'
-            }
-        }), 200
+        return jsonify({'success': True, 'user': {
+            'id': 'admin-001', 'email': admin_email,
+            'name': os.getenv('ADMIN_NAME', 'Administrator'), 'role': 'admin'
+        }}), 200
 
     except Exception as e:
         print(f"Admin login error: {e}")
@@ -142,13 +118,15 @@ def admin_login():
 def create_report():
     try:
         data = request.json
-        print(f"Creating report: {data}")
+        # Do NOT log data — contains base64 photos, causes timeout
+        print(f"Creating report: user={data.get('userId')}, photos={len(data.get('photos', []))}")
 
         user_id = data.get('userId')
         if not user_id:
             return jsonify({'success': False, 'error': 'User ID required'}), 400
 
-        report_data = {
+        # Insert report
+        response = supabase.table('reports').insert({
             'user_id': user_id,
             'issue_type': data.get('issueType'),
             'description': data.get('description'),
@@ -156,52 +134,48 @@ def create_report():
             'longitude': data.get('location', {}).get('lng') if data.get('location') else None,
             'address': data.get('address'),
             'status': 'pending'
-        }
+        }).execute()
 
-        response = supabase.table('reports').insert(report_data).execute()
         report_id = response.data[0]['id']
+        print(f"Report inserted: {report_id}")
 
-        # Upload photos to Supabase Storage
+        # Upload photos using service role client (bypasses RLS)
         photos = data.get('photos', [])
-        photo_urls = []
         if photos:
-            print(f"Uploading {len(photos)} photos...")
-            for idx, photo_data in enumerate(photos[:5]):  # max 5
+            print(f"Uploading {len(photos)} photo(s)...")
+            for idx, photo_b64 in enumerate(photos[:5]):
                 try:
-                    # Strip base64 prefix if present
-                    if ',' in photo_data:
-                        photo_data = photo_data.split(',')[1]
-
-                    photo_bytes = base64.b64decode(photo_data)
+                    raw = photo_b64.split(',')[1] if ',' in photo_b64 else photo_b64
+                    photo_bytes = base64.b64decode(raw)
                     filename = f"{report_id}/photo_{idx}_{int(datetime.now().timestamp())}.jpg"
 
-                    supabase.storage.from_('report-photos').upload(
-                        filename,
-                        photo_bytes,
-                        {'content-type': 'image/jpeg'}
+                    # Use supabase_admin (service role) for storage upload
+                    supabase_admin.storage.from_('report-photos').upload(
+                        filename, photo_bytes, {'content-type': 'image/jpeg'}
                     )
 
-                    public_url = supabase.storage.from_('report-photos').get_public_url(filename)
-                    photo_urls.append(public_url)
-                    print(f"Photo {idx} uploaded: {public_url}")
+                    url_result = supabase_admin.storage.from_('report-photos').get_public_url(filename)
+                    # Handle both string response (old SDK) and object response (new SDK)
+                    public_url = url_result if isinstance(url_result, str) else (
+                        url_result.get('publicUrl') or url_result.get('public_url') or str(url_result)
+                    )
 
-                except Exception as photo_error:
-                    print(f"Photo {idx} upload failed: {photo_error}")
+                    # Save URL to DB — column is photo_data
+                    supabase.table('report_photos').insert({
+                        'report_id': report_id,
+                        'photo_data': public_url
+                    }).execute()
 
-            # Save photo URLs to DB
-            for url in photo_urls:
-                supabase.table('report_photos').insert({
-                    'report_id': report_id,
-                    'photo_url': url
-                }).execute()
+                    print(f"Photo {idx} saved: {public_url}")
 
-        print(f"Report created: {report_id}")
+                except Exception as e:
+                    print(f"Photo {idx} failed: {e}")
+
         return jsonify({'success': True, 'reportId': report_id}), 201
 
     except Exception as e:
         print(f"Create report error: {e}")
-        import traceback
-        traceback.print_exc()
+        import traceback; traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -213,7 +187,7 @@ def get_user_reports(user_id):
         reports = []
         for report in response.data:
             photos_response = supabase.table('report_photos').select('*').eq('report_id', report['id']).execute()
-            photos = [p.get('photo_url') or p.get('photo_data', '') for p in photos_response.data]
+            photos = [p['photo_data'] for p in photos_response.data if p.get('photo_data')]
 
             comments_response = supabase.table('admin_comments').select('*').eq('report_id', report['id']).order('created_at', desc=False).execute()
 
@@ -247,7 +221,7 @@ def get_all_reports():
             user = user_response.data[0] if user_response.data else {}
 
             photos_response = supabase.table('report_photos').select('*').eq('report_id', report['id']).execute()
-            photos = [p.get('photo_url') or p.get('photo_data', '') for p in photos_response.data]
+            photos = [p['photo_data'] for p in photos_response.data if p.get('photo_data')]
 
             comments_response = supabase.table('admin_comments').select('*').eq('report_id', report['id']).order('created_at', desc=False).execute()
 
@@ -278,13 +252,10 @@ def update_report_status(report_id):
     try:
         data = request.json
         status = data.get('status')
-        allowed = {'pending', 'in_progress', 'resolved'}
-        if status not in allowed:
-            return jsonify({'success': False, 'error': f'status must be one of {allowed}'}), 400
-
+        if status not in {'pending', 'in_progress', 'resolved'}:
+            return jsonify({'success': False, 'error': 'Invalid status'}), 400
         supabase.table('reports').update({'status': status}).eq('id', report_id).execute()
         return jsonify({'success': True}), 200
-
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -296,17 +267,12 @@ def add_comment(report_id):
         comment = (data.get('comment') or '').strip()
         if not comment:
             return jsonify({'success': False, 'error': 'Comment cannot be empty'}), 400
-
-        admin_id = data.get('adminId', 'admin-001')
-
         supabase.table('admin_comments').insert({
             'report_id': report_id,
-            'admin_id': admin_id,
+            'admin_id': data.get('adminId', 'admin-001'),
             'comment_text': comment
         }).execute()
-
         return jsonify({'success': True}), 201
-
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -314,25 +280,20 @@ def add_comment(report_id):
 @app.route('/api/reports/<report_id>', methods=['DELETE'])
 def delete_report(report_id):
     try:
-        # Delete photos from storage first
-        photos_response = supabase.table('report_photos').select('photo_url').eq('report_id', report_id).execute()
+        photos_response = supabase.table('report_photos').select('photo_data').eq('report_id', report_id).execute()
         for photo in photos_response.data:
-            url = photo.get('photo_url') or photo.get('photo_data', '')
+            url = photo.get('photo_data', '')
             if url and 'report-photos' in url:
                 try:
-                    # Extract path from URL
                     path = url.split('/report-photos/')[1]
-                    supabase.storage.from_('report-photos').remove([path])
+                    supabase_admin.storage.from_('report-photos').remove([path])
                 except Exception as e:
-                    print(f"Could not delete photo from storage: {e}")
+                    print(f"Storage delete failed: {e}")
 
-        # Delete related records
         supabase.table('report_photos').delete().eq('report_id', report_id).execute()
         supabase.table('admin_comments').delete().eq('report_id', report_id).execute()
         supabase.table('reports').delete().eq('id', report_id).execute()
-
         return jsonify({'success': True}), 200
-
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -343,8 +304,6 @@ def delete_report(report_id):
 def health_check():
     return jsonify({'status': 'ok', 'timestamp': datetime.utcnow().isoformat()}), 200
 
-
-# ============= MIDDLEWARE =============
 
 @app.before_request
 def log_request():
