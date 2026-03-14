@@ -207,19 +207,22 @@ async function getUserIssues() {
         if (result.success && result.reports) {
             console.log(`Received ${result.reports.length} reports from database`);
             
-            return result.reports.map(report => {
+            const mapped = result.reports.map(report => {
                 return {
                     id: report.id,
                     type: report.issueType,
                     title: `${report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General'} Issue`,
                     description: report.description,
-                    status: report.status || 'pending', // Will be 'pending', 'in_progress', or 'resolved'
+                    status: report.status || 'pending',
                     date: report.timestamp ? new Date(report.timestamp).toLocaleDateString() : new Date().toLocaleDateString(),
                     location: report.address || 'Location not specified',
                     comments: report.comments || [],
                     photos: report.photos || []
                 };
             });
+
+            window.__CB_USER_ISSUES__ = mapped; // store for viewIssue modal
+            return mapped;
         } else {
             console.warn('API returned error:', result);
             showAlert('Failed to load reports from database', 'error');
@@ -289,11 +292,86 @@ function filterIssues(filter, allIssues) {
     }
 }
 
-// Global functions for issue actions
+// ── View Issue Details Modal ──────────────────────────────────
 window.viewIssue = function(issueId) {
-    alert('Issue ID: ' + issueId + '\n\nThis feature will show full issue details in a modal.');
+    const issues = window.__CB_USER_ISSUES__ || [];
+    const issue = issues.find(i => String(i.id) === String(issueId));
+    if (!issue) { alert('Could not find issue details.'); return; }
+
+    document.getElementById('issueDetailModal')?.remove();
+
+    const statusLabel = (issue.status || 'pending').replace('_', ' ');
+    const statusClass = issue.status === 'resolved'
+        ? 'status-resolved'
+        : issue.status === 'in_progress'
+            ? 'status-in-progress'
+            : 'status-pending';
+
+    const photosHTML = issue.photos && issue.photos.length > 0
+        ? `<div class="detail-photo-grid">
+               ${issue.photos.map((url, i) => `
+                   <img src="${_escHtml(url)}"
+                        alt="Photo ${i + 1}"
+                        class="detail-photo"
+                        onclick="window.open('${_escHtml(url)}', '_blank')"
+                        onerror="this.style.display='none'">
+               `).join('')}
+           </div>`
+        : '<p style="opacity:0.6;font-size:0.9rem;margin:0;">No photos attached.</p>';
+
+    const commentsHTML = issue.comments && issue.comments.length > 0
+        ? issue.comments.map(c => `
+            <div class="admin-comment-user">
+                <strong><i class="fas fa-user-shield"></i> Admin</strong>
+                <p>${_escHtml(c.comment_text || '')}</p>
+                <small>${c.created_at ? new Date(c.created_at).toLocaleString() : ''}</small>
+            </div>`).join('')
+        : '<p style="opacity:0.6;font-size:0.9rem;margin:0;">No admin response yet.</p>';
+
+    const modal = document.createElement('div');
+    modal.id = 'issueDetailModal';
+    modal.className = 'modal';
+    modal.style.display = 'block';
+    modal.innerHTML = `
+        <div class="modal-content large-modal" style="max-width:600px;">
+            <span class="close">&times;</span>
+            <div class="login-header" style="margin-bottom:16px;">
+                <h2 style="font-size:1.2rem;">${_escHtml(issue.title || 'Issue Details')}</h2>
+                <span class="issue-status ${statusClass}" style="display:inline-block;margin-top:6px;">${statusLabel}</span>
+            </div>
+            <div class="detail-section">
+                <h4><i class="fas fa-info-circle"></i> Details</h4>
+                <p><strong>Type:</strong> ${_escHtml(issue.type || 'General')}</p>
+                <p style="margin-top:6px;"><strong>Description:</strong> ${_escHtml(issue.description || '')}</p>
+                <p style="margin-top:6px;"><strong>Location:</strong> ${_escHtml(issue.location || 'Not specified')}</p>
+                <p style="margin-top:6px;"><strong>Reported:</strong> ${_escHtml(issue.date || '')}</p>
+            </div>
+            <div class="detail-section">
+                <h4><i class="fas fa-camera"></i> Photos</h4>
+                ${photosHTML}
+            </div>
+            <div class="detail-section">
+                <h4><i class="fas fa-user-shield"></i> Admin Response</h4>
+                ${commentsHTML}
+            </div>
+            <div style="margin-top:20px;text-align:right;">
+                <button class="btn btn-outline" onclick="document.getElementById('issueDetailModal').remove()">Close</button>
+            </div>
+        </div>`;
+
+    document.body.appendChild(modal);
+    modal.querySelector('.close').addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 };
 
-window.viewIssuePhotos = function(issueId) {
-    alert('Issue ID: ' + issueId + '\n\nThis will show all photos for this issue.');
-};
+window.viewIssuePhotos = window.viewIssue;
+
+function _escHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}

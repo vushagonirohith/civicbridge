@@ -582,3 +582,42 @@ input, textarea, select, button {
         gap: 20px;
     }
 }
+
+/* ─── ISSUE DETAIL MODAL PHOTOS ────────────────────────────── */
+.detail-section {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+.detail-section:last-of-type { border-bottom: none; }
+.detail-section h4 { color: var(--secondary); margin-bottom: 10px; font-size: 1rem; }
+.detail-section p  { margin-bottom: 6px; line-height: 1.5; color: var(--text-color); }
+
+.detail-photo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.detail-photo {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.detail-photo:hover {
+    transform: scale(1.04);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+@media (max-width: 480px) {
+    .detail-photo-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+}
