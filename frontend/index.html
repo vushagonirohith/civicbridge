@@ -349,22 +349,11 @@
                 <div class="form-group">
                     <label for="photoUpload">Upload Photos (Optional)</label>
                     <div class="upload-container" id="uploadContainer">
-                        <input type="file" id="photoUpload" accept="image/*" multiple>
+                        <!-- inputs live here, never inside #photoPreview -->
+                        <input type="file" id="photoUpload" accept="image/*" multiple style="display:none">
                         <input type="file" id="photoCapture" accept="image/*" capture="environment" style="display:none">
                         <div class="upload-preview" id="photoPreview">
-                            <div class="upload-placeholder" id="uploadPlaceholder">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <span>Add Photos</span>
-                                <div class="upload-btn-group">
-                                    <button type="button" class="btn btn-outline btn-small" id="galleryBtn">
-                                        <i class="fas fa-images"></i> Gallery
-                                    </button>
-                                    <button type="button" class="btn btn-outline btn-small" id="cameraBtn">
-                                        <i class="fas fa-camera"></i> Camera
-                                    </button>
-                                </div>
-                                <small>Max 5 photos</small>
-                            </div>
+                            <!-- filled by JS -->
                         </div>
                     </div>
                 </div>

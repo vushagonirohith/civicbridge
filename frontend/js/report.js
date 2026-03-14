@@ -20,46 +20,20 @@ class ReportManager {
         const findLiveLocationBtn = document.getElementById('findLiveLocationBtn');
 
         if (reportForm) reportForm.addEventListener('submit', (e) => this.handleReportSubmit(e));
+
+        // Both inputs (gallery + camera) go through the same handler
         if (photoUpload) photoUpload.addEventListener('change', (e) => this.handlePhotoUpload(e));
         if (photoCapture) photoCapture.addEventListener('change', (e) => this.handlePhotoUpload(e));
+
         if (findLiveLocationBtn) findLiveLocationBtn.addEventListener('click', () => this.useCurrentLocation());
         if (currentLocationBtn) currentLocationBtn.addEventListener('click', () => this.useCurrentLocation());
         if (cancelReport) cancelReport.addEventListener('click', () => this.closeReportModal());
 
-        // Gallery button
-        document.getElementById('galleryBtn')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.getElementById('photoUpload').click();
-        });
-
-        // Camera button — uses capture input
-        document.getElementById('cameraBtn')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            document.getElementById('photoCapture').click();
-        });
-
-        // Tap on preview area (not on a button) also opens gallery
-        const photoPreview = document.getElementById('photoPreview');
-        if (photoPreview) this.attachPhotoPreviewListener();
+        // Initial placeholder render (wires gallery/camera buttons too)
+        const preview = document.getElementById('photoPreview');
+        if (preview) this._showPlaceholderInPreview(preview);
 
         this.setupModalListener();
-    }
-
-    attachPhotoPreviewListener() {
-        const photoUpload = document.getElementById('photoUpload');
-        const photoPreview = document.getElementById('photoPreview');
-        if (photoPreview && photoUpload) {
-            photoPreview.addEventListener('click', (event) => {
-                // Don't intercept button clicks or remove clicks
-                if (event.target.closest('.remove-image') ||
-                    event.target.closest('#galleryBtn') ||
-                    event.target.closest('#cameraBtn')) return;
-                // Only open gallery if clicking on the placeholder area itself
-                if (event.target.closest('#uploadPlaceholder') || event.target.closest('.upload-placeholder')) {
-                    photoUpload.click();
-                }
-            });
-        }
     }
 
     setupModalListener() {
@@ -293,116 +267,125 @@ class ReportManager {
         }
     }
 
+    // Called by both #photoUpload (gallery) and #photoCapture (camera)
     handlePhotoUpload(event) {
-        const files = Array.from(event.target.files);
-        const preview = document.getElementById('photoPreview');
-        const maxSizePerFile = 10 * 1024 * 1024; // 10MB per file
-        const maxTotal = 50 * 1024 * 1024; // 50MB total
+        const newFiles = Array.from(event.target.files || []);
+        // reset the input so the same file can be picked again if needed
+        event.target.value = '';
 
+        if (newFiles.length === 0) return;
+
+        const remaining = 5 - this.uploadedPhotos.length;
+        if (remaining <= 0) {
+            showAlert('Maximum 5 photos allowed. Remove one first.', 'info');
+            return;
+        }
+
+        const toAdd = newFiles.slice(0, remaining);
+
+        toAdd.forEach(file => {
+            if (!file.type.startsWith('image/')) {
+                showAlert(`${file.name} is not an image`, 'error');
+                return;
+            }
+            if (file.size > 10 * 1024 * 1024) {
+                showAlert(`${file.name} exceeds 10MB`, 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const base64 = e.target.result; // full data:image/...;base64,... string
+                this.uploadedPhotos.push(base64);
+                this._renderPhotoPreview();
+            };
+            reader.onerror = () => showAlert(`Could not read ${file.name}`, 'error');
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Rebuild the preview area from this.uploadedPhotos
+    _renderPhotoPreview() {
+        const preview = document.getElementById('photoPreview');
         if (!preview) return;
 
-        // Check total size
-        const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-        if (totalSize > maxTotal) {
-            showAlert('Total file size exceeds 50MB limit', 'error');
+        if (this.uploadedPhotos.length === 0) {
+            this._showPlaceholderInPreview(preview);
             return;
         }
 
-        // Check individual file sizes
-        const oversized = files.filter(f => f.size > maxSizePerFile);
-        if (oversized.length > 0) {
-            showAlert(`Some files exceed 10MB limit. Max: ${oversized.length} file(s)`, 'error');
-            return;
-        }
+        // Keep the hidden file inputs outside preview so they survive innerHTML resets
+        preview.innerHTML = this.uploadedPhotos.map((src, i) => `
+            <div class="preview-image" data-index="${i}">
+                <img src="${src}" alt="Photo ${i + 1}">
+                <button type="button" class="remove-image" data-index="${i}">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>`).join('');
 
-        const validFiles = files.slice(0, 5); // Max 5 files
-
-        if (validFiles.length === 0) {
-            this.showUploadPlaceholder();
-            return;
-        }
-
-        // Read all files asynchronously
-        const fileReaders = validFiles.map(file => {
-            return new Promise((resolve, reject) => {
-                if (!file.type.startsWith('image/')) return reject('Invalid file type');
-
-                const reader = new FileReader();
-                reader.onload = (e) => resolve(e.target.result);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
+        // Add remove listeners
+        preview.querySelectorAll('.remove-image').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.dataset.index);
+                this.uploadedPhotos.splice(idx, 1);
+                this._renderPhotoPreview();
             });
         });
 
-        Promise.all(fileReaders)
-            .then(results => {
-                this.uploadedPhotos = results;
-                preview.innerHTML = '';
-                results.forEach(photo => this.addPhotoToPreview(photo));
-                this.attachPhotoPreviewListener();
-            })
-            .catch(err => {
-                console.error('Error reading files:', err);
-                showAlert('Some photos could not be uploaded', 'error');
-            });
+        // Tap anywhere on the grid (not on a remove btn) to add more
+        preview.addEventListener('click', (e) => {
+            if (!e.target.closest('.remove-image')) {
+                document.getElementById('photoUpload')?.click();
+            }
+        }, { once: true }); // re-attached on next render
     }
 
-    addPhotoToPreview(imageData) {
-        const preview = document.getElementById('photoPreview');
-        const previewImage = document.createElement('div');
-        previewImage.className = 'preview-image';
-        previewImage.innerHTML = `
-            <img src="${imageData}" alt="Preview">
-            <button type="button" class="remove-image" onclick="reportManager.removePhoto(this)">
-                <i class="fas fa-times"></i>
-            </button>
-        `;
-        preview.appendChild(previewImage);
+    _showPlaceholderInPreview(preview) {
+        preview.innerHTML = `
+            <div class="upload-placeholder" id="uploadPlaceholder">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <span>Add Photos</span>
+                <div class="upload-btn-group">
+                    <button type="button" class="btn btn-outline btn-small" id="galleryBtn">
+                        <i class="fas fa-images"></i> Gallery
+                    </button>
+                    <button type="button" class="btn btn-outline btn-small" id="cameraBtn">
+                        <i class="fas fa-camera"></i> Camera
+                    </button>
+                </div>
+                <small>Max 5 photos</small>
+            </div>`;
+
+        document.getElementById('galleryBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('photoUpload')?.click();
+        });
+        document.getElementById('cameraBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('photoCapture')?.click();
+        });
     }
 
     showUploadPlaceholder() {
+        // Only reset photos array + re-render if explicitly called (form reset)
+        this.uploadedPhotos = [];
         const preview = document.getElementById('photoPreview');
-        if (preview) {
-            preview.innerHTML = `
-                <div class="upload-placeholder" id="uploadPlaceholder">
-                    <i class="fas fa-cloud-upload-alt"></i>
-                    <span>Add Photos</span>
-                    <div class="upload-btn-group">
-                        <button type="button" class="btn btn-outline btn-small" id="galleryBtn">
-                            <i class="fas fa-images"></i> Gallery
-                        </button>
-                        <button type="button" class="btn btn-outline btn-small" id="cameraBtn">
-                            <i class="fas fa-camera"></i> Camera
-                        </button>
-                    </div>
-                    <small>Max 5 photos</small>
-                </div>
-            `;
+        if (preview) this._showPlaceholderInPreview(preview);
+    }
 
-            // Rewire buttons after innerHTML replacement
-            document.getElementById('galleryBtn')?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                document.getElementById('photoUpload').click();
-            });
-            document.getElementById('cameraBtn')?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                document.getElementById('photoCapture').click();
-            });
-
-            this.attachPhotoPreviewListener();
-        }
+    addPhotoToPreview(imageData) {
+        // Legacy path — just push and re-render
+        this.uploadedPhotos.push(imageData);
+        this._renderPhotoPreview();
     }
 
     removePhoto(button) {
-        const previewImage = button.parentElement;
-        const img = previewImage.querySelector('img');
-        const imageSrc = img.src;
-        
-        this.uploadedPhotos = this.uploadedPhotos.filter(photo => photo !== imageSrc);
-        previewImage.remove();
-        
-        if (this.uploadedPhotos.length === 0) {
-            this.showUploadPlaceholder();
+        // Legacy path (called from onclick attr in old HTML) — kept for safety
+        const idx = parseInt(button.closest('.preview-image')?.dataset.index);
+        if (!isNaN(idx)) {
+            this.uploadedPhotos.splice(idx, 1);
+            this._renderPhotoPreview();
         }
     }
 
@@ -499,21 +482,17 @@ class ReportManager {
 
     resetReportForm() {
         document.getElementById('reportForm').reset();
-        this.showUploadPlaceholder();
         this.selectedLocation = null;
         this.uploadedPhotos = [];
-        
+        const preview = document.getElementById('photoPreview');
+        if (preview) this._showPlaceholderInPreview(preview);
+
         const coordinatesDisplay = document.getElementById('coordinates');
-        if (coordinatesDisplay) {
-            coordinatesDisplay.textContent = 'Lat: 0.0000, Lng: 0.0000';
-        }
-        
-        if (window.reportMarker) {
-            window.reportMarker.setMap(null);
-            window.reportMarker = null;
-        }
-        // Clear search input
-        document.getElementById('locationSearch').value = '';
+        if (coordinatesDisplay) coordinatesDisplay.textContent = 'Lat: 0.0000, Lng: 0.0000';
+
+        if (window.reportMarker) { window.reportMarker.setMap(null); window.reportMarker = null; }
+        const ls = document.getElementById('locationSearch');
+        if (ls) ls.value = '';
     }
 
     setSelectedLocation(location) {
