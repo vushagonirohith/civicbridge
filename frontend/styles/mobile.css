@@ -1,0 +1,584 @@
+/* ============================================================
+   CivicBridge — Mobile Fixes
+   Add this as the LAST stylesheet in index.html:
+   <link rel="stylesheet" href="styles/mobile.css">
+   ============================================================ */
+
+/* ─── UPLOAD BUTTON GROUP (all screen sizes) ───────────────── */
+.upload-btn-group {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 10px 0 6px;
+}
+
+.upload-btn-group .btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    color: var(--text-color);
+    border-color: var(--border-color);
+    background: var(--card-bg);
+    font-size: 0.9rem !important;
+}
+
+.upload-btn-group .btn:hover {
+    border-color: var(--secondary);
+    color: var(--secondary);
+}
+
+/* ─── BASE TOUCH IMPROVEMENTS ─────────────────────────────── */
+* {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation; /* removes 300ms tap delay */
+}
+
+input, textarea, select, button {
+    font-size: 16px !important; /* prevents iOS auto-zoom on focus */
+}
+
+/* ─── HEADER ───────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    header {
+        padding: 0.6rem 0;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+
+    .header-content {
+        flex-direction: row;       /* keep logo + actions on same line */
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .logo h1 {
+        font-size: 1.2rem;
+    }
+
+    /* hide desktop nav on mobile — use scroll anchors instead */
+    nav {
+        display: none;
+    }
+
+    .header-actions {
+        width: auto;
+    }
+
+    .auth-buttons {
+        gap: 6px;
+    }
+
+    .auth-buttons .btn {
+        padding: 6px 10px;
+        font-size: 0.8rem !important;
+    }
+}
+
+/* ─── HERO ─────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .hero {
+        padding: 4rem 0 3rem;
+        min-height: 60vh;
+        background-attachment: scroll; /* fixed breaks on iOS */
+    }
+
+    .hero h2 {
+        font-size: 1.7rem;
+        line-height: 1.3;
+    }
+
+    .hero p {
+        font-size: 1rem;
+    }
+
+    .hero-buttons {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 0 20px;
+        gap: 12px;
+    }
+
+    .hero-buttons .btn {
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* ─── MODALS (login / signup / report) ─────────────────────── */
+@media (max-width: 768px) {
+    /* full-screen sheet on mobile */
+    .modal-content {
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-height: 100dvh;           /* use dynamic viewport height */
+        border-radius: 0 !important;
+        padding: 20px 16px 32px !important;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* report modal is taller — needs special treatment */
+    .large-modal {
+        max-height: 100dvh !important;
+        margin: 0 !important;
+        width: 100% !important;
+        border-radius: 0 !important;
+    }
+
+    #reportForm {
+        max-height: none;
+        overflow-y: visible;
+        padding-right: 0;
+    }
+
+    .close {
+        top: 12px;
+        right: 12px;
+        font-size: 1.8rem;
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,0.08);
+        border-radius: 50%;
+        z-index: 10;
+    }
+
+    .login-header {
+        margin-top: 10px;
+        margin-bottom: 16px;
+    }
+
+    .form-group {
+        margin-bottom: 14px;
+    }
+
+    .form-group label {
+        font-size: 0.9rem;
+        margin-bottom: 4px;
+        display: block;
+    }
+
+    .form-control {
+        padding: 12px 14px;
+        border-radius: 8px;
+        width: 100%;
+    }
+
+    .form-actions {
+        flex-direction: column-reverse;
+        gap: 10px;
+    }
+
+    .form-actions .btn {
+        width: 100%;
+        padding: 14px;
+        font-size: 1rem !important;
+        border-radius: 8px;
+    }
+}
+
+/* ─── REPORT FORM — image upload ───────────────────────────── */
+@media (max-width: 768px) {
+    .upload-container {
+        padding: 16px;
+        border-width: 2px;
+        border-radius: 10px;
+        /* make the whole area easily tappable */
+        cursor: pointer;
+    }
+
+    .upload-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .upload-placeholder i {
+        font-size: 2.5rem;
+    }
+
+    .upload-placeholder span {
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .upload-placeholder small {
+        font-size: 0.8rem;
+        opacity: 0.7;
+    }
+
+    /* photo input — make entire upload-container act as trigger */
+    #photoUpload {
+        display: none;
+    }
+
+    /* grid of previews — 3 per row on mobile */
+    .upload-preview {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-top: 10px;
+    }
+
+    .preview-image {
+        width: 100%;
+        height: 90px;
+        border-radius: 8px;
+    }
+
+    .remove-image {
+        width: 24px;
+        height: 24px;
+        font-size: 0.75rem;
+        top: 4px;
+        right: 4px;
+    }
+}
+
+/* ─── REPORT FORM — map ────────────────────────────────────── */
+@media (max-width: 768px) {
+    #mapContainer {
+        height: 220px;
+        border-radius: 8px;
+    }
+
+    .search-container {
+        flex-direction: row;
+        gap: 8px;
+    }
+
+    .search-container .form-control {
+        flex: 1;
+    }
+
+    .location-btn {
+        padding: 12px 14px;
+        flex-shrink: 0;
+    }
+
+    #findLiveLocationBtn {
+        padding: 14px;
+        font-size: 1rem !important;
+        border-radius: 8px;
+        margin-bottom: 8px !important;
+    }
+
+    .coordinates-display {
+        font-size: 0.8rem !important;
+        padding: 6px 10px;
+    }
+}
+
+/* ─── DASHBOARD ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .dashboard-section {
+        padding: 2rem 0;
+    }
+
+    .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .dashboard-header .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .dashboard-stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .dashboard-stat-card {
+        padding: 14px 10px;
+    }
+
+    .dashboard-stat-number {
+        font-size: 1.6rem;
+    }
+
+    .issues-filters {
+        gap: 8px;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .filter-btn {
+        flex-shrink: 0;
+        padding: 8px 14px;
+        font-size: 0.85rem;
+    }
+
+    .issue-card {
+        padding: 16px;
+    }
+
+    .issue-header {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .issue-status {
+        align-self: flex-start;
+    }
+
+    .issue-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .issue-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .issue-actions .btn {
+        width: 100%;
+        justify-content: center;
+        padding: 10px;
+    }
+
+    /* photos in issue card */
+    .photo-gallery {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+
+    .photo-gallery img {
+        width: 100%;
+        height: 80px;
+        object-fit: cover;
+        border-radius: 6px;
+    }
+}
+
+/* ─── ADMIN DASHBOARD ───────────────────────────────────────── */
+@media (max-width: 768px) {
+    .admin-controls {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .search-filter {
+        flex-direction: column;
+        min-width: 100%;
+        gap: 8px;
+    }
+
+    .search-filter .form-control,
+    .search-filter select {
+        width: 100%;
+    }
+
+    .admin-issue-card {
+        padding: 16px;
+    }
+
+    .status-controls {
+        flex-direction: row;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .status-select {
+        flex: 1;
+        min-width: 130px;
+    }
+
+    .admin-issue-actions {
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 12px;
+    }
+
+    .admin-issue-actions .btn {
+        width: 100%;
+        justify-content: center;
+        padding: 12px;
+    }
+
+    /* detail modal full screen */
+    .issue-detail-content {
+        max-height: none;
+        overflow-y: visible;
+    }
+
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .modal-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ─── COMMUNITY MAP SECTION ─────────────────────────────────── */
+@media (max-width: 768px) {
+    .map-section {
+        padding: 2.5rem 0;
+    }
+
+    #communityMap {
+        height: 320px;
+    }
+
+    .map-controls {
+        position: static;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px;
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .map-controls .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .map-legend {
+        position: static;
+        margin: 0;
+        border-top: 1px solid var(--border-color);
+        border-radius: 0 0 12px 12px;
+        padding: 12px;
+    }
+
+    .legend-items {
+        flex-direction: row;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+}
+
+/* ─── ALERTS ────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .custom-alert {
+        top: auto;
+        bottom: 20px;
+        right: 12px;
+        left: 12px;
+        max-width: none;
+        font-size: 0.9rem;
+    }
+}
+
+/* ─── CHATBOT ───────────────────────────────────────────────── */
+@media (max-width: 500px) {
+    .chatbot-container {
+        bottom: 16px;
+        right: 16px;
+    }
+
+    .chatbot-box {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        left: 0;
+        width: 100%;
+        height: 75dvh;
+        border-radius: 20px 20px 0 0;
+        z-index: 10001;
+    }
+}
+
+/* ─── SETTINGS MODAL ────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .settings-tabs {
+        display: flex;
+        overflow-x: auto;
+        gap: 4px;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+    }
+
+    .tab-btn {
+        flex-shrink: 0;
+        padding: 8px 14px;
+        font-size: 0.85rem;
+    }
+}
+
+/* ─── MISC SMALL SCREEN POLISH ─────────────────────────────── */
+@media (max-width: 480px) {
+    .container {
+        padding: 0 14px;
+    }
+
+    .section-title h2 {
+        font-size: 1.5rem;
+    }
+
+    .section-title p {
+        font-size: 0.95rem;
+    }
+
+    .dashboard-stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .dashboard-stat-number {
+        font-size: 1.4rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    .stat-number {
+        font-size: 1.8rem;
+    }
+
+    /* feature cards single column */
+    .features-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .feature-card {
+        padding: 20px 16px;
+    }
+
+    /* steps */
+    .steps-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .step-card {
+        padding: 24px 20px;
+    }
+
+    footer {
+        padding: 2rem 0 1rem;
+    }
+
+    .footer-content {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+}

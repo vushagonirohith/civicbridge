@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="styles/dashboard.css">
     <link rel="stylesheet" href="styles/settings.css">
     <link rel="stylesheet" href="styles/report.css">
+    <link rel="stylesheet" href="styles/mobile.css">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -347,12 +348,22 @@
                 
                 <div class="form-group">
                     <label for="photoUpload">Upload Photos (Optional)</label>
-                    <div class="upload-container">
+                    <div class="upload-container" id="uploadContainer">
                         <input type="file" id="photoUpload" accept="image/*" multiple>
+                        <input type="file" id="photoCapture" accept="image/*" capture="environment" style="display:none">
                         <div class="upload-preview" id="photoPreview">
-                            <div class="upload-placeholder">
+                            <div class="upload-placeholder" id="uploadPlaceholder">
                                 <i class="fas fa-cloud-upload-alt"></i>
-                                <span>Click to upload photos</span>
+                                <span>Add Photos</span>
+                                <div class="upload-btn-group">
+                                    <button type="button" class="btn btn-outline btn-small" id="galleryBtn">
+                                        <i class="fas fa-images"></i> Gallery
+                                    </button>
+                                    <button type="button" class="btn btn-outline btn-small" id="cameraBtn">
+                                        <i class="fas fa-camera"></i> Camera
+                                    </button>
+                                </div>
+                                <small>Max 5 photos</small>
                             </div>
                         </div>
                     </div>

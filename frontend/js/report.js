@@ -14,53 +14,52 @@ class ReportManager {
     setupEventListeners() {
         const reportForm = document.getElementById('reportForm');
         const photoUpload = document.getElementById('photoUpload');
+        const photoCapture = document.getElementById('photoCapture');
         const currentLocationBtn = document.getElementById('currentLocationBtn');
         const cancelReport = document.getElementById('cancelReport');
-        const findLiveLocationBtn = document.getElementById('findLiveLocationBtn'); // The new button
+        const findLiveLocationBtn = document.getElementById('findLiveLocationBtn');
 
-        if (reportForm) {
-            reportForm.addEventListener('submit', (e) => this.handleReportSubmit(e));
-        }
+        if (reportForm) reportForm.addEventListener('submit', (e) => this.handleReportSubmit(e));
+        if (photoUpload) photoUpload.addEventListener('change', (e) => this.handlePhotoUpload(e));
+        if (photoCapture) photoCapture.addEventListener('change', (e) => this.handlePhotoUpload(e));
+        if (findLiveLocationBtn) findLiveLocationBtn.addEventListener('click', () => this.useCurrentLocation());
+        if (currentLocationBtn) currentLocationBtn.addEventListener('click', () => this.useCurrentLocation());
+        if (cancelReport) cancelReport.addEventListener('click', () => this.closeReportModal());
 
-        if (photoUpload) {
-            photoUpload.addEventListener('change', (e) => this.handlePhotoUpload(e));
-        }
-        
-        // Setup listener for the new dedicated button
-        if (findLiveLocationBtn) {
-            findLiveLocationBtn.addEventListener('click', () => this.useCurrentLocation());
-        }
-        
-        // Keep listener for top location button (if user clicks it)
-        if (currentLocationBtn) {
-            currentLocationBtn.addEventListener('click', () => this.useCurrentLocation());
-        }
+        // Gallery button
+        document.getElementById('galleryBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('photoUpload').click();
+        });
 
-        if (cancelReport) {
-            cancelReport.addEventListener('click', () => this.closeReportModal());
-        }
+        // Camera button — uses capture input
+        document.getElementById('cameraBtn')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.getElementById('photoCapture').click();
+        });
 
-        // Photo preview click to trigger file input
+        // Tap on preview area (not on a button) also opens gallery
         const photoPreview = document.getElementById('photoPreview');
-        if (photoPreview) {
-            this.attachPhotoPreviewListener();
-        }
+        if (photoPreview) this.attachPhotoPreviewListener();
 
-        // Initialize map when modal opens
         this.setupModalListener();
     }
 
     attachPhotoPreviewListener() {
-         const photoUpload = document.getElementById('photoUpload');
-         const photoPreview = document.getElementById('photoPreview');
-         if (photoPreview && photoUpload) {
-             photoPreview.addEventListener('click', (event) => {
-                 // Check if click target is a remove button
-                 if (!event.target.closest('.remove-image')) {
-                     photoUpload.click();
-                 }
-             });
-         }
+        const photoUpload = document.getElementById('photoUpload');
+        const photoPreview = document.getElementById('photoPreview');
+        if (photoPreview && photoUpload) {
+            photoPreview.addEventListener('click', (event) => {
+                // Don't intercept button clicks or remove clicks
+                if (event.target.closest('.remove-image') ||
+                    event.target.closest('#galleryBtn') ||
+                    event.target.closest('#cameraBtn')) return;
+                // Only open gallery if clicking on the placeholder area itself
+                if (event.target.closest('#uploadPlaceholder') || event.target.closest('.upload-placeholder')) {
+                    photoUpload.click();
+                }
+            });
+        }
     }
 
     setupModalListener() {
@@ -365,13 +364,31 @@ class ReportManager {
         const preview = document.getElementById('photoPreview');
         if (preview) {
             preview.innerHTML = `
-                <div class="upload-placeholder">
+                <div class="upload-placeholder" id="uploadPlaceholder">
                     <i class="fas fa-cloud-upload-alt"></i>
-                    <span>Click to upload photos</span>
-                    <small>Max 5 images, 5MB each</small>
+                    <span>Add Photos</span>
+                    <div class="upload-btn-group">
+                        <button type="button" class="btn btn-outline btn-small" id="galleryBtn">
+                            <i class="fas fa-images"></i> Gallery
+                        </button>
+                        <button type="button" class="btn btn-outline btn-small" id="cameraBtn">
+                            <i class="fas fa-camera"></i> Camera
+                        </button>
+                    </div>
+                    <small>Max 5 photos</small>
                 </div>
             `;
-            // Ensure listener is attached to the new placeholder
+
+            // Rewire buttons after innerHTML replacement
+            document.getElementById('galleryBtn')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('photoUpload').click();
+            });
+            document.getElementById('cameraBtn')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.getElementById('photoCapture').click();
+            });
+
             this.attachPhotoPreviewListener();
         }
     }
