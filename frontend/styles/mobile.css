@@ -621,3 +621,59 @@ input, textarea, select, button {
         gap: 8px;
     }
 }
+
+/* ─── ADMIN PHOTO GRID + LIGHTBOX ──────────────────────────── */
+.admin-photo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.admin-photo-thumb {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid var(--border-color);
+    background: var(--light);
+    transition: border-color 0.2s, transform 0.2s;
+}
+
+.admin-photo-thumb:hover {
+    border-color: var(--secondary);
+    transform: scale(1.03);
+}
+
+.admin-photo-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.admin-photo-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    color: white;
+    font-size: 1.4rem;
+    opacity: 0;
+}
+
+.admin-photo-thumb:hover .admin-photo-overlay {
+    background: rgba(0,0,0,0.45);
+    opacity: 1;
+}
+
+@media (max-width: 480px) {
+    .admin-photo-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+}
