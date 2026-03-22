@@ -5,6 +5,8 @@ import os
 from dotenv import load_dotenv
 import hashlib
 import base64
+import random
+import string
 from datetime import datetime
 
 load_dotenv()
@@ -16,13 +18,47 @@ CORS(app,
      allow_headers=["Content-Type", "Authorization"])
 
 SUPABASE_URL = os.getenv('SUPABASE_URL')
-SUPABASE_KEY = os.getenv('SUPABASE_KEY')                          # anon key — DB queries
-SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY', SUPABASE_KEY)  # service role — Storage
+SUPABASE_KEY = os.getenv('SUPABASE_KEY')
+SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY', SUPABASE_KEY)
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)             # for DB
-supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)  # for Storage uploads
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-# ============= AUTH ROUTES =============
+
+def generate_ticket_id():
+    """Generate a unique short ticket ID like CB-00123"""
+    # Get current count of reports and pad it
+    try:
+        result = supabase.table('reports').select('id', count='exact').execute()
+        count = result.count if result.count else 0
+    except:
+        count = 0
+    # Add random suffix to avoid collisions on concurrent inserts
+    num = count + 1 + random.randint(0, 9)
+    return f"CB-{num:05d}"
+
+
+def report_dict(report, photos=None, comments=None, user=None):
+    d = {
+        'id': report['id'],
+        'ticket_id': report.get('ticket_id', ''),
+        'issueType': report['issue_type'],
+        'description': report['description'],
+        'location': {'lat': report['latitude'], 'lng': report['longitude']},
+        'address': report['address'],
+        'photos': photos or [],
+        'status': report['status'],
+        'comments': comments or [],
+        'timestamp': report['created_at'],
+    }
+    if user:
+        d['userName'] = user.get('name', 'Unknown')
+        d['userEmail'] = user.get('email', 'Unknown')
+        d['userId'] = report['user_id']
+    return d
+
+
+# ============= AUTH =============
 
 @app.route('/api/auth/signup', methods=['POST'])
 def signup():
@@ -51,7 +87,6 @@ def signup():
         return jsonify({'success': True, 'user': {
             'id': response.data[0]['id'], 'email': email, 'name': name, 'role': 'user'
         }}), 201
-
     except Exception as e:
         print(f"Signup error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -81,7 +116,6 @@ def login():
             'id': user['id'], 'email': user['email'],
             'name': user['name'], 'role': user['role']
         }}), 200
-
     except Exception as e:
         print(f"Login error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -106,28 +140,28 @@ def admin_login():
             'id': 'admin-001', 'email': admin_email,
             'name': os.getenv('ADMIN_NAME', 'Administrator'), 'role': 'admin'
         }}), 200
-
     except Exception as e:
         print(f"Admin login error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-# ============= REPORT ROUTES =============
+# ============= REPORTS =============
 
 @app.route('/api/reports', methods=['POST'])
 def create_report():
     try:
         data = request.json
-        # Do NOT log data — contains base64 photos, causes timeout
         print(f"Creating report: user={data.get('userId')}, photos={len(data.get('photos', []))}")
 
         user_id = data.get('userId')
         if not user_id:
             return jsonify({'success': False, 'error': 'User ID required'}), 400
 
-        # Insert report
+        ticket_id = generate_ticket_id()
+
         response = supabase.table('reports').insert({
             'user_id': user_id,
+            'ticket_id': ticket_id,
             'issue_type': data.get('issueType'),
             'description': data.get('description'),
             'latitude': data.get('location', {}).get('lat') if data.get('location') else None,
@@ -137,9 +171,8 @@ def create_report():
         }).execute()
 
         report_id = response.data[0]['id']
-        print(f"Report inserted: {report_id}")
+        print(f"Report created: {report_id} | Ticket: {ticket_id}")
 
-        # Upload photos using service role client (bypasses RLS)
         photos = data.get('photos', [])
         if photos:
             print(f"Uploading {len(photos)} photo(s)...")
@@ -149,29 +182,25 @@ def create_report():
                     photo_bytes = base64.b64decode(raw)
                     filename = f"{report_id}/photo_{idx}_{int(datetime.now().timestamp())}.jpg"
 
-                    # Use supabase_admin (service role) for storage upload
                     supabase_admin.storage.from_('report-photos').upload(
                         filename, photo_bytes, {'content-type': 'image/jpeg'}
                     )
 
                     url_result = supabase_admin.storage.from_('report-photos').get_public_url(filename)
-                    # Handle both string response (old SDK) and object response (new SDK)
                     public_url = url_result if isinstance(url_result, str) else (
                         url_result.get('publicUrl') or url_result.get('public_url') or str(url_result)
                     )
 
-                    # Save URL to DB — column is photo_data
                     supabase.table('report_photos').insert({
                         'report_id': report_id,
                         'photo_data': public_url
                     }).execute()
 
-                    print(f"Photo {idx} saved: {public_url}")
-
+                    print(f"Photo {idx} saved OK")
                 except Exception as e:
                     print(f"Photo {idx} failed: {e}")
 
-        return jsonify({'success': True, 'reportId': report_id}), 201
+        return jsonify({'success': True, 'reportId': report_id, 'ticketId': ticket_id}), 201
 
     except Exception as e:
         print(f"Create report error: {e}")
@@ -188,23 +217,10 @@ def get_user_reports(user_id):
         for report in response.data:
             photos_response = supabase.table('report_photos').select('*').eq('report_id', report['id']).execute()
             photos = [p['photo_data'] for p in photos_response.data if p.get('photo_data')]
-
             comments_response = supabase.table('admin_comments').select('*').eq('report_id', report['id']).order('created_at', desc=False).execute()
-
-            reports.append({
-                'id': report['id'],
-                'issueType': report['issue_type'],
-                'description': report['description'],
-                'location': {'lat': report['latitude'], 'lng': report['longitude']},
-                'address': report['address'],
-                'photos': photos,
-                'status': report['status'],
-                'comments': comments_response.data,
-                'timestamp': report['created_at']
-            })
+            reports.append(report_dict(report, photos, comments_response.data))
 
         return jsonify({'success': True, 'reports': reports}), 200
-
     except Exception as e:
         print(f"Get user reports error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -219,31 +235,46 @@ def get_all_reports():
         for report in response.data:
             user_response = supabase.table('users').select('id, name, email').eq('id', report['user_id']).execute()
             user = user_response.data[0] if user_response.data else {}
-
             photos_response = supabase.table('report_photos').select('*').eq('report_id', report['id']).execute()
             photos = [p['photo_data'] for p in photos_response.data if p.get('photo_data')]
-
             comments_response = supabase.table('admin_comments').select('*').eq('report_id', report['id']).order('created_at', desc=False).execute()
-
-            reports.append({
-                'id': report['id'],
-                'userId': report['user_id'],
-                'userName': user.get('name', 'Unknown'),
-                'userEmail': user.get('email', 'Unknown'),
-                'issueType': report['issue_type'],
-                'description': report['description'],
-                'location': {'lat': report['latitude'], 'lng': report['longitude']},
-                'address': report['address'],
-                'photos': photos,
-                'status': report['status'],
-                'comments': comments_response.data,
-                'timestamp': report['created_at']
-            })
+            reports.append(report_dict(report, photos, comments_response.data, user))
 
         return jsonify({'success': True, 'reports': reports}), 200
-
     except Exception as e:
         print(f"Get all reports error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ── SEARCH BY TICKET ID ──────────────────────────────────────────────────────
+
+@app.route('/api/reports/search', methods=['GET'])
+def search_by_ticket():
+    """Search a report by ticket_id. Works for both users and admin."""
+    try:
+        ticket_id = request.args.get('ticket_id', '').strip().upper()
+        if not ticket_id:
+            return jsonify({'success': False, 'error': 'ticket_id query param required'}), 400
+
+        result = supabase.table('reports').select('*').eq('ticket_id', ticket_id).execute()
+
+        if not result.data:
+            return jsonify({'success': False, 'error': f'No report found with ticket ID {ticket_id}'}), 404
+
+        report = result.data[0]
+        user_response = supabase.table('users').select('id, name, email').eq('id', report['user_id']).execute()
+        user = user_response.data[0] if user_response.data else {}
+        photos_response = supabase.table('report_photos').select('*').eq('report_id', report['id']).execute()
+        photos = [p['photo_data'] for p in photos_response.data if p.get('photo_data')]
+        comments_response = supabase.table('admin_comments').select('*').eq('report_id', report['id']).order('created_at', desc=False).execute()
+
+        return jsonify({
+            'success': True,
+            'report': report_dict(report, photos, comments_response.data, user)
+        }), 200
+
+    except Exception as e:
+        print(f"Search error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -297,8 +328,6 @@ def delete_report(report_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
-# ============= HEALTH CHECK =============
 
 @app.route('/api/health', methods=['GET'])
 def health_check():

@@ -77,6 +77,17 @@ class AdminManager {
                             ${this.getUserFilterOptions()}
                         </select>
                     </div>
+                    <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
+                        <input type="text" id="adminTicketSearch" class="form-control"
+                            placeholder="Jump to Ticket ID (e.g. CB-00001)"
+                            style="flex:1;font-family:monospace;text-transform:uppercase;max-width:280px;">
+                        <button class="btn btn-primary" id="adminTicketSearchBtn" style="white-space:nowrap;">
+                            <i class="fas fa-search"></i> Find Ticket
+                        </button>
+                        <button class="btn btn-outline" id="adminTicketClear" style="display:none;white-space:nowrap;">
+                            Clear
+                        </button>
+                    </div>
                 </div>
 
                 <div class="admin-issues-list" id="adminIssuesList">
@@ -118,6 +129,7 @@ class AdminManager {
                     <div>
                         <div class="issue-title">${report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General'} Issue</div>
                         <span class="issue-type">${report.issueType}</span>
+                        ${report.ticket_id ? `<span style="margin-left:8px;font-family:monospace;font-size:0.78rem;font-weight:700;color:var(--secondary);background:var(--light);padding:2px 8px;border-radius:4px;"><i class="fas fa-ticket-alt"></i> ${report.ticket_id}</span>` : ''}
                     </div>
                     <span class="issue-status status-${report.status}">${report.status.replace('_', ' ')}</span>
                 </div>
@@ -175,9 +187,49 @@ async function loadAdminDashboard() {
 function attachAdminEventListeners() {
     // Refresh button
     const refreshBtn = document.getElementById('refreshAdminDashboardBtn');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', loadAdminDashboard);
+    if (refreshBtn) refreshBtn.addEventListener('click', loadAdminDashboard);
+
+    // ── Ticket ID search ─────────────────────────────────────────
+    const ticketInput = document.getElementById('adminTicketSearch');
+    const ticketBtn   = document.getElementById('adminTicketSearchBtn');
+    const ticketClear = document.getElementById('adminTicketClear');
+
+    async function doTicketSearch() {
+        const val = (ticketInput?.value || '').trim();
+        if (!val) return;
+        ticketBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        ticketBtn.disabled = true;
+
+        const result = await apiService.searchByTicket(val);
+
+        ticketBtn.innerHTML = '<i class="fas fa-search"></i> Find Ticket';
+        ticketBtn.disabled = false;
+
+        const listEl = document.getElementById('adminIssuesList');
+        if (!result.success) {
+            listEl.innerHTML = `<div class="no-issues">
+                <i class="fas fa-search" style="color:var(--secondary)"></i>
+                <h3>Not found</h3>
+                <p>No report with ticket ID <strong>${val.toUpperCase()}</strong></p>
+            </div>`;
+            if (ticketClear) ticketClear.style.display = 'inline-block';
+            return;
+        }
+
+        const r = result.report;
+        adminManager.allReports = [r];
+        if (listEl) listEl.innerHTML = adminManager.renderAdminIssuesList([r]);
+        attachAdminEventListeners();
+        if (ticketClear) ticketClear.style.display = 'inline-block';
     }
+
+    ticketBtn?.addEventListener('click', doTicketSearch);
+    ticketInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') doTicketSearch(); });
+    ticketClear?.addEventListener('click', () => {
+        if (ticketInput) ticketInput.value = '';
+        if (ticketClear) ticketClear.style.display = 'none';
+        loadAdminDashboard();
+    });
 
     // Status filter
     const statusFilter = document.getElementById('statusFilter');
@@ -287,201 +339,78 @@ function filterAdminReports() {
     }
 }
 
-function _esc(str) {
-    if (str == null) return '';
-    return String(str)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-}
-
-function openLightbox(photos, startIndex) {
-    document.getElementById('adminLightbox')?.remove();
-
-    let current = startIndex;
-
-    const lb = document.createElement('div');
-    lb.id = 'adminLightbox';
-    lb.style.cssText = `
-        position:fixed;top:0;left:0;width:100%;height:100%;
-        background:rgba(0,0,0,0.92);z-index:20000;
-        display:flex;flex-direction:column;align-items:center;justify-content:center;`;
-
-    const render = () => {
-        lb.innerHTML = `
-            <div style="position:relative;width:100%;max-width:900px;padding:0 16px;text-align:center;">
-                <!-- close -->
-                <button onclick="document.getElementById('adminLightbox').remove()"
-                    style="position:fixed;top:16px;right:20px;background:rgba(255,255,255,0.15);
-                           border:none;color:white;font-size:1.6rem;width:44px;height:44px;
-                           border-radius:50%;cursor:pointer;z-index:10;">✕</button>
-
-                <!-- counter -->
-                <div style="color:#ccc;font-size:0.85rem;margin-bottom:10px;">
-                    ${current + 1} / ${photos.length}
-                </div>
-
-                <!-- image -->
-                <img src="${_esc(photos[current])}"
-                     alt="Photo ${current + 1}"
-                     style="max-width:100%;max-height:75vh;border-radius:8px;object-fit:contain;display:block;margin:0 auto;"
-                     onerror="this.src='';this.alt='Image failed to load';this.style.padding='40px';this.style.color='#fff';">
-
-                <!-- nav -->
-                <div style="display:flex;justify-content:center;gap:16px;margin-top:16px;">
-                    ${photos.length > 1 ? `
-                        <button id="lbPrev" style="background:rgba(255,255,255,0.15);border:none;color:white;
-                            padding:10px 22px;border-radius:6px;font-size:1rem;cursor:pointer;">
-                            ← Prev
-                        </button>
-                        <button id="lbNext" style="background:rgba(255,255,255,0.15);border:none;color:white;
-                            padding:10px 22px;border-radius:6px;font-size:1rem;cursor:pointer;">
-                            Next →
-                        </button>` : ''}
-                    <a href="${_esc(photos[current])}" target="_blank"
-                       style="background:rgba(255,255,255,0.15);color:white;text-decoration:none;
-                              padding:10px 22px;border-radius:6px;font-size:1rem;">
-                        <i class="fas fa-external-link-alt"></i> Open Full
-                    </a>
-                </div>
-            </div>`;
-
-        lb.querySelector('#lbPrev')?.addEventListener('click', () => {
-            current = (current - 1 + photos.length) % photos.length;
-            render();
-        });
-        lb.querySelector('#lbNext')?.addEventListener('click', () => {
-            current = (current + 1) % photos.length;
-            render();
-        });
-    };
-
-    render();
-    document.body.appendChild(lb);
-
-    // swipe support for mobile
-    let touchStartX = 0;
-    lb.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
-    lb.addEventListener('touchend', e => {
-        const diff = touchStartX - e.changedTouches[0].clientX;
-        if (Math.abs(diff) > 50) {
-            current = diff > 0
-                ? (current + 1) % photos.length
-                : (current - 1 + photos.length) % photos.length;
-            render();
-        }
-    });
-
-    lb.addEventListener('click', e => { if (e.target === lb) lb.remove(); });
-
-    // keyboard nav
-    const onKey = e => {
-        if (e.key === 'ArrowRight') { current = (current + 1) % photos.length; render(); }
-        if (e.key === 'ArrowLeft')  { current = (current - 1 + photos.length) % photos.length; render(); }
-        if (e.key === 'Escape')     { lb.remove(); document.removeEventListener('keydown', onKey); }
-    };
-    document.addEventListener('keydown', onKey);
-}
-
 function showReportDetailsModal(report) {
-    document.getElementById('reportDetailsModal')?.remove();
-
-    const statusLabel = (report.status || 'pending').replace('_', ' ');
-    const statusClass = report.status === 'resolved'
-        ? 'status-resolved'
-        : report.status === 'in_progress' ? 'status-in-progress' : 'status-pending';
-
-    // ── Photos section ──────────────────────────────────────────
-    let photosHTML = '<p style="opacity:0.6;font-size:0.9rem;margin:0;">No photos attached to this report.</p>';
-    if (report.photos && report.photos.length > 0) {
-        const thumbs = report.photos.map((url, i) => `
-            <div class="admin-photo-thumb" onclick="openLightbox(window.__currentReportPhotos__, ${i})"
-                 title="Click to view full size">
-                <img src="${_esc(url)}" alt="Photo ${i + 1}"
-                     onerror="this.parentElement.style.display='none'">
-                <div class="admin-photo-overlay"><i class="fas fa-search-plus"></i></div>
-            </div>`).join('');
-
-        photosHTML = `
-            <div class="admin-photo-grid">${thumbs}</div>
-            <p style="font-size:0.8rem;opacity:0.6;margin-top:8px;">
-                <i class="fas fa-info-circle"></i>
-                Tap any photo to view full size. ${report.photos.length} photo${report.photos.length > 1 ? 's' : ''} total.
-            </p>`;
-    }
-
-    // ── Comments section ────────────────────────────────────────
-    const commentsHTML = report.comments && report.comments.length > 0
-        ? report.comments.map(c => `
-            <div style="background:var(--light);padding:10px 14px;margin:6px 0;border-radius:6px;border-left:3px solid var(--secondary);">
-                <small style="opacity:0.7;">${c.created_at ? new Date(c.created_at).toLocaleString() : ''}</small>
-                <p style="margin:4px 0 0;">${_esc(c.comment_text || '')}</p>
-            </div>`).join('')
-        : '<p style="opacity:0.6;font-size:0.9rem;margin:0;">No admin comments yet.</p>';
-
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.id = 'reportDetailsModal';
     modal.innerHTML = `
-        <div class="modal-content large-modal" style="max-width:660px;">
+        <div class="modal-content large-modal">
             <span class="close">&times;</span>
-
-            <div class="login-header" style="margin-bottom:18px;">
-                <h2 style="font-size:1.2rem;">
-                    <i class="fas fa-map-marker-alt"></i>
-                    ${_esc(report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'Issue')} Report
-                </h2>
-                <span class="issue-status ${statusClass}" style="display:inline-block;margin-top:6px;">${statusLabel}</span>
+            <div class="login-header">
+                <h2>Report Details</h2>
+                <p>${report.issueType} - ${report.status}</p>
             </div>
-
-            <!-- User -->
-            <div class="detail-section">
-                <h4><i class="fas fa-user"></i> Reported By</h4>
-                <p><strong>Name:</strong> ${_esc(report.userName || 'Unknown')}</p>
-                <p style="margin-top:4px;"><strong>Email:</strong> ${_esc(report.userEmail || 'Unknown')}</p>
-            </div>
-
-            <!-- Issue info -->
-            <div class="detail-section">
-                <h4><i class="fas fa-info-circle"></i> Issue Details</h4>
-                <p><strong>Type:</strong> ${_esc(report.issueType || 'General')}</p>
-                <p style="margin-top:4px;"><strong>Description:</strong> ${_esc(report.description || '')}</p>
-                <p style="margin-top:4px;"><strong>Location:</strong> ${_esc(report.address || 'Not specified')}</p>
-                <p style="margin-top:4px;"><strong>Date:</strong> ${report.timestamp ? new Date(report.timestamp).toLocaleDateString() : 'Unknown'}</p>
-            </div>
-
-            <!-- Photos -->
-            <div class="detail-section">
-                <h4><i class="fas fa-camera"></i> Photos</h4>
-                ${photosHTML}
-            </div>
-
-            <!-- Comments + add new -->
-            <div class="detail-section">
-                <h4><i class="fas fa-comments"></i> Admin Comments</h4>
-                <div id="commentsList" style="margin-bottom:14px;">${commentsHTML}</div>
-                <div style="display:flex;gap:10px;">
-                    <input type="text" id="newComment" class="form-control"
-                           placeholder="Add a comment visible to the user..." style="flex:1;">
-                    <button class="btn btn-primary" onclick="addCommentToReport('${_esc(report.id)}')">
-                        <i class="fas fa-paper-plane"></i> Send
+            
+            <div style="padding: 20px;">
+                <h4>User Information</h4>
+                <p><strong>Name:</strong> ${report.userName}</p>
+                <p><strong>Email:</strong> ${report.userEmail}</p>
+                
+                <h4>Issue Details</h4>
+                <p><strong>Type:</strong> ${report.issueType}</p>
+                <p><strong>Description:</strong> ${report.description}</p>
+                <p><strong>Location:</strong> ${report.address}</p>
+                <p><strong>Date:</strong> ${new Date(report.timestamp).toLocaleDateString()}</p>
+                
+                ${report.photos && report.photos.length > 0 ? `
+                    <h4>Photos</h4>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        ${report.photos.map(photo => `
+                            <img src="${photo}" alt="Report photo" style="max-width: 150px; border-radius: 5px;">
+                        `).join('')}
+                    </div>
+                ` : ''}
+                
+                <h4>Admin Comments</h4>
+                <div id="commentsList" style="margin-bottom: 20px;">
+                    ${report.comments && report.comments.length > 0 ? report.comments.map(c => `
+                        <div style="background: #f0f0f0; padding: 10px; margin: 5px 0; border-radius: 5px;">
+                            <p style="margin: 0;"><strong>${new Date(c.created_at).toLocaleString()}:</strong></p>
+                            <p style="margin: 5px 0;">${c.comment_text}</p>
+                        </div>
+                    `).join('') : '<p>No comments yet</p>'}
+                </div>
+                
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="newComment" class="form-control" placeholder="Add a comment..." style="flex: 1;">
+                    <button class="btn btn-primary" onclick="addCommentToReport('${report.id}')">
+                        <i class="fas fa-comment"></i> Add Comment
                     </button>
                 </div>
+                
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-outline close-modal">Close</button>
+                </div>
             </div>
-
-            <div style="display:flex;justify-content:flex-end;margin-top:10px;">
-                <button class="btn btn-outline close-modal">Close</button>
-            </div>
-        </div>`;
-
+        </div>
+    `;
+    
     document.body.appendChild(modal);
     modal.style.display = 'block';
-
-    // Store photos on window so lightbox can access them
-    window.__currentReportPhotos__ = report.photos || [];
-
-    modal.querySelector('.close').addEventListener('click', () => modal.remove());
-    modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    
+    modal.querySelector('.close').addEventListener('click', () => {
+        modal.remove();
+    });
+    
+    modal.querySelector('.close-modal').addEventListener('click', () => {
+        modal.remove();
+    });
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
 }
 
 async function addCommentToReport(reportId) {

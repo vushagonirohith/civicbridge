@@ -33,7 +33,6 @@ const apiService = {
         }
     },
 
-    // Admin login — now uses /api/admin/login (credentials stored in Render env vars)
     async adminLogin(email, password) {
         try {
             const response = await fetch(`${API_BASE}/admin/login`, {
@@ -122,5 +121,19 @@ const apiService = {
             console.error('Delete report error:', error);
             return { success: false, error: error.message };
         }
+    },
+
+    // ============= TICKET SEARCH =============
+
+    async searchByTicket(ticketId) {
+        try {
+            const id = ticketId.trim().toUpperCase();
+            const response = await fetch(`${API_BASE}/reports/search?ticket_id=${encodeURIComponent(id)}`);
+            return await response.json();
+        } catch (error) {
+            console.error('Search error:', error);
+            return { success: false, error: error.message };
+        }
     }
+
 };

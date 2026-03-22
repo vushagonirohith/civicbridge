@@ -55,6 +55,7 @@ async function loadUserDashboard() {
     
     dashboardSection.innerHTML = getUserDashboardHTML(userData, userIssues);
     initializeDashboard(userIssues);
+    initTicketSearch(userIssues);
 }
 
 function getUserDashboardHTML(userData, userIssues = []) {
@@ -111,6 +112,18 @@ function getUserDashboardHTML(userData, userIssues = []) {
                 <button class="filter-btn" data-filter="pending">Pending</button>
                 <button class="filter-btn" data-filter="in_progress">In Progress</button>
                 <button class="filter-btn" data-filter="resolved">Resolved</button>
+            </div>
+
+            <div class="ticket-search-bar" style="display:flex;gap:10px;margin-bottom:16px;align-items:center;">
+                <input type="text" id="ticketSearchInput" class="form-control"
+                    placeholder="Search by Ticket ID (e.g. CB-00001)"
+                    style="flex:1;font-family:monospace;text-transform:uppercase;">
+                <button class="btn btn-primary" id="ticketSearchBtn" style="white-space:nowrap;">
+                    <i class="fas fa-search"></i> Search
+                </button>
+                <button class="btn btn-outline" id="ticketSearchClear" style="display:none;white-space:nowrap;">
+                    Clear
+                </button>
             </div>
 
             <div class="issues-list" id="issuesList">
@@ -207,9 +220,10 @@ async function getUserIssues() {
         if (result.success && result.reports) {
             console.log(`Received ${result.reports.length} reports from database`);
             
-            const mapped = result.reports.map(report => {
+            return result.reports.map(report => {
                 return {
                     id: report.id,
+                    ticket_id: report.ticket_id || '',
                     type: report.issueType,
                     title: `${report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General'} Issue`,
                     description: report.description,
@@ -220,9 +234,6 @@ async function getUserIssues() {
                     photos: report.photos || []
                 };
             });
-
-            window.__CB_USER_ISSUES__ = mapped; // store for viewIssue modal
-            return mapped;
         } else {
             console.warn('API returned error:', result);
             showAlert('Failed to load reports from database', 'error');
@@ -254,7 +265,10 @@ function renderIssuesList(issues) {
                     <div class="issue-title">${issue.title}</div>
                     <span class="issue-type">${issue.type?.charAt(0).toUpperCase() + issue.type?.slice(1) || 'General'}</span>
                 </div>
-                <span class="issue-status status-${issue.status}">${issue.status.replace('_', ' ')}</span>
+                <div style="text-align:right;">
+                    <span class="issue-status status-${issue.status}">${issue.status.replace('_', ' ')}</span>
+                    ${issue.ticket_id ? `<div style="margin-top:4px;font-family:monospace;font-size:0.75rem;font-weight:700;color:var(--secondary);background:var(--light);padding:2px 8px;border-radius:4px;display:inline-block;">${issue.ticket_id}</div>` : ''}
+                </div>
             </div>
             <div class="issue-description">${issue.description}</div>
             <div class="issue-meta">
@@ -292,86 +306,71 @@ function filterIssues(filter, allIssues) {
     }
 }
 
-// ── View Issue Details Modal ──────────────────────────────────
+// Global functions for issue actions
 window.viewIssue = function(issueId) {
-    const issues = window.__CB_USER_ISSUES__ || [];
-    const issue = issues.find(i => String(i.id) === String(issueId));
-    if (!issue) { alert('Could not find issue details.'); return; }
-
-    document.getElementById('issueDetailModal')?.remove();
-
-    const statusLabel = (issue.status || 'pending').replace('_', ' ');
-    const statusClass = issue.status === 'resolved'
-        ? 'status-resolved'
-        : issue.status === 'in_progress'
-            ? 'status-in-progress'
-            : 'status-pending';
-
-    const photosHTML = issue.photos && issue.photos.length > 0
-        ? `<div class="detail-photo-grid">
-               ${issue.photos.map((url, i) => `
-                   <img src="${_escHtml(url)}"
-                        alt="Photo ${i + 1}"
-                        class="detail-photo"
-                        onclick="window.open('${_escHtml(url)}', '_blank')"
-                        onerror="this.style.display='none'">
-               `).join('')}
-           </div>`
-        : '<p style="opacity:0.6;font-size:0.9rem;margin:0;">No photos attached.</p>';
-
-    const commentsHTML = issue.comments && issue.comments.length > 0
-        ? issue.comments.map(c => `
-            <div class="admin-comment-user">
-                <strong><i class="fas fa-user-shield"></i> Admin</strong>
-                <p>${_escHtml(c.comment_text || '')}</p>
-                <small>${c.created_at ? new Date(c.created_at).toLocaleString() : ''}</small>
-            </div>`).join('')
-        : '<p style="opacity:0.6;font-size:0.9rem;margin:0;">No admin response yet.</p>';
-
-    const modal = document.createElement('div');
-    modal.id = 'issueDetailModal';
-    modal.className = 'modal';
-    modal.style.display = 'block';
-    modal.innerHTML = `
-        <div class="modal-content large-modal" style="max-width:600px;">
-            <span class="close">&times;</span>
-            <div class="login-header" style="margin-bottom:16px;">
-                <h2 style="font-size:1.2rem;">${_escHtml(issue.title || 'Issue Details')}</h2>
-                <span class="issue-status ${statusClass}" style="display:inline-block;margin-top:6px;">${statusLabel}</span>
-            </div>
-            <div class="detail-section">
-                <h4><i class="fas fa-info-circle"></i> Details</h4>
-                <p><strong>Type:</strong> ${_escHtml(issue.type || 'General')}</p>
-                <p style="margin-top:6px;"><strong>Description:</strong> ${_escHtml(issue.description || '')}</p>
-                <p style="margin-top:6px;"><strong>Location:</strong> ${_escHtml(issue.location || 'Not specified')}</p>
-                <p style="margin-top:6px;"><strong>Reported:</strong> ${_escHtml(issue.date || '')}</p>
-            </div>
-            <div class="detail-section">
-                <h4><i class="fas fa-camera"></i> Photos</h4>
-                ${photosHTML}
-            </div>
-            <div class="detail-section">
-                <h4><i class="fas fa-user-shield"></i> Admin Response</h4>
-                ${commentsHTML}
-            </div>
-            <div style="margin-top:20px;text-align:right;">
-                <button class="btn btn-outline" onclick="document.getElementById('issueDetailModal').remove()">Close</button>
-            </div>
-        </div>`;
-
-    document.body.appendChild(modal);
-    modal.querySelector('.close').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    alert('Issue ID: ' + issueId + '\n\nThis feature will show full issue details in a modal.');
 };
 
-window.viewIssuePhotos = window.viewIssue;
+window.viewIssuePhotos = function(issueId) {
+    alert('Issue ID: ' + issueId + '\n\nThis will show all photos for this issue.');
+};
 
-function _escHtml(str) {
-    if (str == null) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+// ── Ticket ID Search (user dashboard) ────────────────────────────────────
+function initTicketSearch(allIssues) {
+    const input = document.getElementById('ticketSearchInput');
+    const btn   = document.getElementById('ticketSearchBtn');
+    const clear = document.getElementById('ticketSearchClear');
+    if (!input || !btn) return;
+
+    async function doSearch() {
+        const val = input.value.trim();
+        if (!val) return;
+
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        btn.disabled = true;
+
+        const result = await apiService.searchByTicket(val);
+
+        btn.innerHTML = '<i class="fas fa-search"></i> Search';
+        btn.disabled = false;
+
+        const listEl = document.getElementById('issuesList');
+        if (!result.success) {
+            listEl.innerHTML = `
+                <div class="no-issues">
+                    <i class="fas fa-search" style="color:var(--secondary)"></i>
+                    <h3>No report found</h3>
+                    <p>No report with ticket ID <strong>${val.toUpperCase()}</strong> found.</p>
+                </div>`;
+            clear.style.display = 'inline-block';
+            return;
+        }
+
+        const r = result.report;
+        const mapped = [{
+            id: r.id,
+            ticket_id: r.ticket_id,
+            type: r.issueType,
+            title: `${(r.issueType||'Issue').charAt(0).toUpperCase() + (r.issueType||'').slice(1)} Issue`,
+            description: r.description,
+            status: r.status || 'pending',
+            date: r.timestamp ? new Date(r.timestamp).toLocaleDateString() : '',
+            location: r.address || 'Location not specified',
+            comments: r.comments || [],
+            photos: r.photos || []
+        }];
+
+        listEl.innerHTML = renderIssuesList(mapped);
+        clear.style.display = 'inline-block';
+    }
+
+    btn.addEventListener('click', doSearch);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+
+    clear.addEventListener('click', () => {
+        input.value = '';
+        clear.style.display = 'none';
+        const listEl = document.getElementById('issuesList');
+        if (listEl) listEl.innerHTML = renderIssuesList(allIssues);
+    });
 }
