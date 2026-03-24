@@ -7,17 +7,87 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
-function formatCoordinates(locationObj) {
-    if (!locationObj || locationObj.lat == null || locationObj.lng == null) return 'Live location not available';
-    const lat = Number(locationObj.lat);
-    const lng = Number(locationObj.lng);
-    if (Number.isNaN(lat) || Number.isNaN(lng)) return 'Live location not available';
-    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+function parseAdminComment(commentObj) {
+    const raw = commentObj?.comment_text || '';
+    const prefix = '__RESOLUTION_PROOF__';
+
+    if (typeof raw === 'string' && raw.startsWith(prefix)) {
+        try {
+            const parsed = JSON.parse(raw.slice(prefix.length));
+            return {
+                type: 'resolution_proof',
+                message: parsed.message || 'Issue resolved by admin.',
+                photos: Array.isArray(parsed.photos) ? parsed.photos : [],
+                created_at: commentObj.created_at
+            };
+        } catch (e) {
+            console.warn('Failed to parse resolution proof comment:', e);
+        }
+    }
+
+    return {
+        type: 'text',
+        message: raw,
+        photos: [],
+        created_at: commentObj?.created_at
+    };
 }
 
-function getMapsLink(locationObj) {
-    if (!locationObj || locationObj.lat == null || locationObj.lng == null) return '';
-    return `https://www.google.com/maps?q=${locationObj.lat},${locationObj.lng}`;
+function getLatestCommentPreview(comments) {
+    if (!comments || !comments.length) return '';
+    const latest = parseAdminComment(comments[comments.length - 1]);
+
+    if (latest.type === 'resolution_proof') {
+        return `
+            <div class="admin-comment-user">
+                <strong><i class="fas fa-check-circle"></i> Resolution Update:</strong>
+                <p>${escapeHtml(latest.message)}</p>
+                ${latest.photos.length ? `<small>${latest.photos.length} proof photo(s) attached</small><br>` : ''}
+                <small>Last updated: ${latest.created_at ? new Date(latest.created_at).toLocaleString() : ''}</small>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="admin-comment-user">
+            <strong><i class="fas fa-user-shield"></i> Admin Response:</strong>
+            <p>${escapeHtml(latest.message)}</p>
+            <small>Last updated: ${latest.created_at ? new Date(latest.created_at).toLocaleString() : ''}</small>
+        </div>
+    `;
+}
+
+function renderCommentDetails(commentObj) {
+    const comment = parseAdminComment(commentObj);
+
+    if (comment.type === 'resolution_proof') {
+        return `
+            <div style="background:#ecfdf3;border:1px solid #b7ebc6;padding:12px;border-radius:10px;margin-bottom:10px;">
+                <div style="font-weight:700;color:#15803d;margin-bottom:6px;">
+                    <i class="fas fa-check-circle"></i> Issue Resolved
+                </div>
+                <div style="margin-bottom:8px;">${escapeHtml(comment.message)}</div>
+                ${comment.photos.length ? `
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
+                        ${comment.photos.map(photo => `
+                            <a href="${photo}" target="_blank" rel="noopener noreferrer">
+                                <img src="${photo}" alt="Resolution proof" style="width:100%;height:120px;object-fit:cover;border-radius:8px;border:1px solid rgba(0,0,0,0.08);">
+                            </a>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                <small style="display:block;margin-top:8px;opacity:.75;">${comment.created_at ? new Date(comment.created_at).toLocaleString() : ''}</small>
+            </div>
+        `;
+    }
+
+    return `
+        <div style="background: var(--light); padding: 12px; border-radius: 8px; margin-bottom: 10px;">
+            <div style="font-weight: 600; margin-bottom: 6px;"><i class="fas fa-user-shield"></i> Admin Update</div>
+            <div style="margin-bottom: 6px;">${escapeHtml(comment.message)}</div>
+            <small style="opacity: 0.75;">${comment.created_at ? new Date(comment.created_at).toLocaleString() : ''}</small>
+        </div>
+    `;
 }
 
 function closeIssueDetailsModal() {
@@ -33,13 +103,7 @@ function showIssueDetailsModal(issue) {
     modal.id = 'issueDetailsModal';
 
     const commentsHtml = issue.comments && issue.comments.length > 0
-        ? issue.comments.map(c => `
-            <div style="background: var(--light); padding: 12px; border-radius: 8px; margin-bottom: 10px;">
-                <div style="font-weight: 600; margin-bottom: 6px;"><i class="fas fa-user-shield"></i> Admin Update</div>
-                <div style="margin-bottom: 6px;">${escapeHtml(c.comment_text || '')}</div>
-                <small style="opacity: 0.75;">${c.created_at ? new Date(c.created_at).toLocaleString() : ''}</small>
-            </div>
-        `).join('')
+        ? issue.comments.map(c => renderCommentDetails(c)).join('')
         : '<p style="opacity:0.75;">No admin updates yet.</p>';
 
     const photosHtml = issue.photos && issue.photos.length > 0
@@ -53,8 +117,6 @@ function showIssueDetailsModal(issue) {
             </div>
         `
         : '<p style="opacity:0.75;">No photos uploaded for this issue.</p>';
-
-    const mapsLink = getMapsLink(issue.locationObj);
 
     modal.innerHTML = `
         <div class="modal-content large-modal">
@@ -80,8 +142,6 @@ function showIssueDetailsModal(issue) {
                     <p><strong>Description:</strong> ${escapeHtml(issue.description || '')}</p>
                     <p><strong>Submitted on:</strong> ${escapeHtml(issue.date || '')}</p>
                     <p><strong>Address:</strong> ${escapeHtml(issue.location || 'Location not specified')}</p>
-                    <p><strong>Submitted live location:</strong> ${escapeHtml(formatCoordinates(issue.locationObj))}</p>
-                    ${mapsLink ? `<p><a href="${mapsLink}" target="_blank" rel="noopener noreferrer"><i class="fas fa-map-marked-alt"></i> Open submitted location in Google Maps</a></p>` : ''}
                 </div>
 
                 <div>
@@ -90,7 +150,7 @@ function showIssueDetailsModal(issue) {
                 </div>
 
                 <div>
-                    <h4 style="margin-bottom:10px;">Admin Updates</h4>
+                    <h4 style="margin-bottom:10px;">Admin Updates / Resolution Proof</h4>
                     ${commentsHtml}
                 </div>
 
@@ -130,7 +190,6 @@ function loadDashboard() {
     const dashboardSection = document.getElementById('dashboard');
     if (!dashboardSection) return;
 
-    // Check if user is admin first
     if (isAdmin()) {
         loadAdminDashboard();
         return;
@@ -146,7 +205,6 @@ function loadDashboard() {
         return;
     }
 
-    // Load user data and display dashboard
     loadUserDashboard();
 }
 
@@ -154,16 +212,14 @@ async function loadUserDashboard() {
     const userData = getCurrentUser();
     const userId = localStorage.getItem('userId');
     
-    console.log('Loading dashboard for user:', userId);
-    
     const dashboardSection = document.getElementById('dashboard');
     if (!dashboardSection) return;
 
     dashboardSection.innerHTML = `<div class="container"><p style="text-align: center; padding: 20px;">Loading your dashboard...</p></div>`;
     
     const userIssues = await getUserIssues();
-    
     window.currentUserIssues = userIssues;
+
     dashboardSection.innerHTML = getUserDashboardHTML(userData, userIssues);
     initializeDashboard(userIssues);
     initTicketSearch(userIssues);
@@ -172,23 +228,23 @@ async function loadUserDashboard() {
 function getUserDashboardHTML(userData, userIssues = []) {
     const userName = localStorage.getItem('userName') || 'User';
     const userEmail = localStorage.getItem('userEmail');
-    
+
     const totalIssues = userIssues.length;
     const pendingIssues = userIssues.filter(issue => issue.status === 'pending').length;
     const inProgressIssues = userIssues.filter(issue => issue.status === 'in_progress').length;
     const resolvedIssues = userIssues.filter(issue => issue.status === 'resolved').length;
-    
+
     const joinDate = userData.created_at ? new Date(userData.created_at).toLocaleDateString() : 'Recently';
-    
+
     return `
         <div class="container">
             <div class="dashboard-header">
                 <div>
-                    <h2>Welcome back, ${userName}!</h2>
+                    <h2>Welcome back, ${escapeHtml(userName)}!</h2>
                     <p>Here's an overview of your reported issues and activity</p>
                     <div style="color: var(--text-color); opacity: 0.7; font-size: 0.9rem;">
-                        <div>Logged in as: ${userEmail}</div>
-                        <div>Member since: ${joinDate}</div>
+                        <div>Logged in as: ${escapeHtml(userEmail || '')}</div>
+                        <div>Member since: ${escapeHtml(joinDate)}</div>
                         <div>Total reports: ${totalIssues}</div>
                     </div>
                 </div>
@@ -223,18 +279,14 @@ function getUserDashboardHTML(userData, userIssues = []) {
                 <button class="filter-btn" data-filter="resolved">Resolved</button>
             </div>
 
-            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px;">
-                <input
-                    type="text"
-                    id="ticketSearchInput"
-                    class="form-control"
+            <div class="ticket-search-bar" style="display:flex;gap:10px;margin-bottom:16px;align-items:center;">
+                <input type="text" id="ticketSearchInput" class="form-control"
                     placeholder="Search by Ticket ID (e.g. CB-00001)"
-                    style="max-width:320px;font-family:monospace;text-transform:uppercase;"
-                />
-                <button class="btn btn-outline" id="ticketSearchBtn">
+                    style="flex:1;font-family:monospace;text-transform:uppercase;">
+                <button class="btn btn-primary" id="ticketSearchBtn" style="white-space:nowrap;">
                     <i class="fas fa-search"></i> Search
                 </button>
-                <button class="btn btn-outline" id="ticketSearchClear" style="display:none;">
+                <button class="btn btn-outline" id="ticketSearchClear" style="display:none;white-space:nowrap;">
                     Clear
                 </button>
             </div>
@@ -243,34 +295,12 @@ function getUserDashboardHTML(userData, userIssues = []) {
                 ${renderIssuesList(userIssues)}
             </div>
 
-            ${totalIssues > 0 ? `
-                <div class="dashboard-card" style="margin-top: 2rem;">
-                    <h3><i class="fas fa-chart-line"></i> Activity Summary</h3>
-                    <div style="display: grid; gap: 1rem; margin-top: 1rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span>Response Rate</span>
-                            <span style="font-weight: 600;">${totalIssues > 0 ? Math.round(((inProgressIssues + resolvedIssues) / totalIssues) * 100) : 0}%</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${totalIssues > 0 ? ((inProgressIssues + resolvedIssues) / totalIssues) * 100 : 0}%"></div>
-                        </div>
-                        
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span>Resolution Rate</span>
-                            <span style="font-weight: 600;">${totalIssues > 0 ? Math.round((resolvedIssues / totalIssues) * 100) : 0}%</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${totalIssues > 0 ? (resolvedIssues / totalIssues) * 100 : 0}%"></div>
-                        </div>
-                        
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
-                            <span>Resolution Rate: ${totalIssues > 0 ? Math.round((resolvedIssues / totalIssues) * 100) : 0}%</span>
-                            <span>Active Issues: ${pendingIssues + inProgressIssues}</span>
-                        </div>
-                    </div>
+            ${userIssues.length > 0 ? `
+                <div style="margin-top: 2rem; padding: 1rem; background: var(--light); border-radius: 8px;">
+                    <h4><i class="fas fa-chart-bar"></i> Your Reporting Activity</h4>
+                    <p>You have submitted ${totalIssues} issue reports with ${resolvedIssues} resolved so far.</p>
                 </div>
             ` : ''}
-
         </div>
     `;
 }
@@ -299,7 +329,7 @@ function initializeDashboard(allIssues) {
         btn.addEventListener('click', function() {
             const filter = this.getAttribute('data-filter');
             filterIssues(filter, allIssues);
-            
+
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
         });
@@ -328,42 +358,29 @@ function initializeDashboard(allIssues) {
 
 async function getUserIssues() {
     const userId = localStorage.getItem('userId');
-    console.log('getUserIssues called with userId:', userId);
-    
-    if (!userId) {
-        console.warn('No userId found');
-        return [];
-    }
+
+    if (!userId) return [];
 
     try {
-        console.log('Fetching reports from backend API...');
         const result = await apiService.getUserReports(userId);
-        
-        console.log('API response:', result);
-        
+
         if (result.success && result.reports) {
-            console.log(`Received ${result.reports.length} reports from database`);
-            
-            return result.reports.map(report => {
-                return {
-                    id: report.id,
-                    ticket_id: report.ticket_id || '',
-                    type: report.issueType,
-                    title: `${report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General'} Issue`,
-                    description: report.description,
-                    status: report.status || 'pending',
-                    date: report.timestamp ? new Date(report.timestamp).toLocaleDateString() : new Date().toLocaleDateString(),
-                    location: report.address || 'Location not specified',
-                    comments: report.comments || [],
-                    photos: report.photos || [],
-                    locationObj: report.location || null
-                };
-            });
-        } else {
-            console.warn('API returned error:', result);
-            showAlert('Failed to load reports from database', 'error');
-            return [];
+            return result.reports.map(report => ({
+                id: report.id,
+                ticket_id: report.ticket_id || '',
+                type: report.issueType,
+                title: `${report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General'} Issue`,
+                description: report.description,
+                status: report.status || 'pending',
+                date: report.timestamp ? new Date(report.timestamp).toLocaleDateString() : new Date().toLocaleDateString(),
+                location: report.address || 'Location not specified',
+                comments: report.comments || [],
+                photos: report.photos || []
+            }));
         }
+
+        showAlert('Failed to load reports from database', 'error');
+        return [];
     } catch (error) {
         console.error('Error fetching user reports:', error);
         showAlert('Failed to load your reports. Please check your connection.', 'error');
@@ -387,32 +404,24 @@ function renderIssuesList(issues) {
         <div class="issue-card">
             <div class="issue-header">
                 <div>
-                    <div class="issue-title">${issue.title}</div>
-                    <span class="issue-type">${issue.type?.charAt(0).toUpperCase() + issue.type?.slice(1) || 'General'}</span>
+                    <div class="issue-title">${escapeHtml(issue.title)}</div>
+                    <span class="issue-type">${escapeHtml(issue.type?.charAt(0).toUpperCase() + issue.type?.slice(1) || 'General')}</span>
                 </div>
                 <div style="text-align:right;">
-                    <span class="issue-status status-${issue.status}">${issue.status.replace('_', ' ')}</span>
-                    ${issue.ticket_id ? `<div style="margin-top:4px;font-family:monospace;font-size:0.75rem;font-weight:700;color:var(--secondary);background:var(--light);padding:2px 8px;border-radius:4px;display:inline-block;">${issue.ticket_id}</div>` : ''}
+                    <span class="issue-status status-${escapeHtml(issue.status || 'pending')}">${escapeHtml((issue.status || 'pending').replace('_', ' '))}</span>
+                    ${issue.ticket_id ? `<div style="margin-top:4px;font-family:monospace;font-size:0.75rem;font-weight:700;color:var(--secondary);background:var(--light);padding:2px 8px;border-radius:4px;display:inline-block;">${escapeHtml(issue.ticket_id)}</div>` : ''}
                 </div>
             </div>
-            <div class="issue-description">${issue.description}</div>
+            <div class="issue-description">${escapeHtml(issue.description || '')}</div>
             <div class="issue-meta">
-                <span><i class="fas fa-map-marker-alt"></i> ${issue.location}</span>
-                <span><i class="fas fa-calendar"></i> ${issue.date}</span>
-                ${issue.photos && issue.photos.length > 0 ? 
-                    `<span><i class="fas fa-camera"></i> ${issue.photos.length} photo(s)</span>` : ''}
+                <span><i class="fas fa-map-marker-alt"></i> ${escapeHtml(issue.location || 'Location not specified')}</span>
+                <span><i class="fas fa-calendar"></i> ${escapeHtml(issue.date || '')}</span>
+                ${issue.photos && issue.photos.length > 0 ? `<span><i class="fas fa-camera"></i> ${issue.photos.length} photo(s)</span>` : ''}
             </div>
-            ${issue.comments && issue.comments.length > 0 ? `
-                <div class="admin-comment-user">
-                    <strong><i class="fas fa-user-shield"></i> Admin Response:</strong>
-                    <p>${issue.comments[issue.comments.length - 1].comment_text}</p>
-                    <small>Last updated: ${new Date(issue.comments[issue.comments.length - 1].created_at).toLocaleString()}</small>
-                </div>
-            ` : ''}
+            ${getLatestCommentPreview(issue.comments)}
             <div class="issue-actions">
                 <button class="btn btn-outline btn-small" onclick="viewIssue('${issue.id}')">View Details</button>
-                ${issue.photos && issue.photos.length > 0 ? 
-                    `<button class="btn btn-outline btn-small" onclick="viewIssuePhotos('${issue.id}')">View Photos</button>` : ''}
+                ${issue.photos && issue.photos.length > 0 ? `<button class="btn btn-outline btn-small" onclick="viewIssuePhotos('${issue.id}')">View Photos</button>` : ''}
             </div>
         </div>
     `).join('');
@@ -420,15 +429,13 @@ function renderIssuesList(issues) {
 
 function filterIssues(filter, allIssues) {
     let filteredIssues = allIssues;
-    
+
     if (filter !== 'all') {
         filteredIssues = allIssues.filter(issue => issue.status === filter);
     }
-    
+
     const issuesList = document.getElementById('issuesList');
-    if (issuesList) {
-        issuesList.innerHTML = renderIssuesList(filteredIssues);
-    }
+    if (issuesList) issuesList.innerHTML = renderIssuesList(filteredIssues);
 }
 
 window.viewIssue = function(issueId) {
@@ -475,7 +482,7 @@ function initTicketSearch(allIssues) {
                 <div class="no-issues">
                     <i class="fas fa-search" style="color:var(--secondary)"></i>
                     <h3>No report found</h3>
-                    <p>No report with ticket ID <strong>${val.toUpperCase()}</strong> found.</p>
+                    <p>No report with ticket ID <strong>${escapeHtml(val.toUpperCase())}</strong> found.</p>
                 </div>`;
             clear.style.display = 'inline-block';
             return;
@@ -486,16 +493,16 @@ function initTicketSearch(allIssues) {
             id: r.id,
             ticket_id: r.ticket_id,
             type: r.issueType,
-            title: `${(r.issueType||'Issue').charAt(0).toUpperCase() + (r.issueType||'').slice(1)} Issue`,
+            title: `${(r.issueType || 'Issue').charAt(0).toUpperCase() + (r.issueType || '').slice(1)} Issue`,
             description: r.description,
             status: r.status || 'pending',
             date: r.timestamp ? new Date(r.timestamp).toLocaleDateString() : '',
             location: r.address || 'Location not specified',
             comments: r.comments || [],
-            photos: r.photos || [],
-            locationObj: r.location || null
+            photos: r.photos || []
         }];
 
+        window.currentUserIssues = mapped;
         listEl.innerHTML = renderIssuesList(mapped);
         clear.style.display = 'inline-block';
     }
@@ -506,6 +513,7 @@ function initTicketSearch(allIssues) {
     clear.addEventListener('click', () => {
         input.value = '';
         clear.style.display = 'none';
+        window.currentUserIssues = allIssues;
         const listEl = document.getElementById('issuesList');
         if (listEl) listEl.innerHTML = renderIssuesList(allIssues);
     });

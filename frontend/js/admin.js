@@ -22,6 +22,50 @@ function getMapsLink(locationObj) {
     return `https://www.google.com/maps?q=${locationObj.lat},${locationObj.lng}`;
 }
 
+function parseAdminComment(commentObj) {
+    const raw = commentObj?.comment_text || '';
+    const prefix = '__RESOLUTION_PROOF__';
+    if (typeof raw === 'string' && raw.startsWith(prefix)) {
+        try {
+            const parsed = JSON.parse(raw.slice(prefix.length));
+            return {
+                type: 'resolution_proof',
+                message: parsed.message || 'Issue resolved by admin.',
+                photos: Array.isArray(parsed.photos) ? parsed.photos : [],
+                created_at: commentObj.created_at,
+                admin_id: commentObj.admin_id
+            };
+        } catch (e) {
+            console.warn('Failed to parse resolution proof comment:', e);
+        }
+    }
+
+    return {
+        type: 'text',
+        message: raw,
+        photos: [],
+        created_at: commentObj?.created_at,
+        admin_id: commentObj?.admin_id
+    };
+}
+
+async function filesToBase64(files) {
+    const arr = Array.from(files || []).slice(0, 5);
+    const results = [];
+
+    for (const file of arr) {
+        const b64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+        results.push(b64);
+    }
+
+    return results;
+}
+
 class AdminManager {
     constructor() {
         this.allReports = [];
@@ -123,7 +167,7 @@ class AdminManager {
     getUserFilterOptions() {
         const reports = this.allReports;
         const users = [...new Set(reports.map(report => report.userName || 'Unknown User'))];
-        return users.map(user => `<option value="${user}">${user}</option>`).join('');
+        return users.map(user => `<option value="${escapeHtml(user)}">${escapeHtml(user)}</option>`).join('');
     }
 
     calculateStats(reports) {
@@ -150,18 +194,18 @@ class AdminManager {
             <div class="admin-issue-card">
                 <div class="issue-header">
                     <div>
-                        <div class="issue-title">${report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General'} Issue</div>
-                        <span class="issue-type">${report.issueType}</span>
-                        ${report.ticket_id ? `<span style="margin-left:8px;font-family:monospace;font-size:0.78rem;font-weight:700;color:var(--secondary);background:var(--light);padding:2px 8px;border-radius:4px;"><i class="fas fa-ticket-alt"></i> ${report.ticket_id}</span>` : ''}
+                        <div class="issue-title">${escapeHtml(report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General')} Issue</div>
+                        <span class="issue-type">${escapeHtml(report.issueType || 'General')}</span>
+                        ${report.ticket_id ? `<span style="margin-left:8px;font-family:monospace;font-size:0.78rem;font-weight:700;color:var(--secondary);background:var(--light);padding:2px 8px;border-radius:4px;"><i class="fas fa-ticket-alt"></i> ${escapeHtml(report.ticket_id)}</span>` : ''}
                     </div>
-                    <span class="issue-status status-${report.status}">${report.status.replace('_', ' ')}</span>
+                    <span class="issue-status status-${escapeHtml(report.status || 'pending')}">${escapeHtml((report.status || 'pending').replace('_', ' '))}</span>
                 </div>
-                <div class="issue-description">${report.description}</div>
+                <div class="issue-description">${escapeHtml(report.description || '')}</div>
                 <div class="issue-meta">
-                    <span><i class="fas fa-user"></i> ${report.userName}</span>
-                    <span><i class="fas fa-envelope"></i> ${report.userEmail}</span>
-                    <span><i class="fas fa-map-marker-alt"></i> ${report.address}</span>
-                    <span><i class="fas fa-calendar"></i> ${new Date(report.timestamp).toLocaleDateString()}</span>
+                    <span><i class="fas fa-user"></i> ${escapeHtml(report.userName || 'Unknown')}</span>
+                    <span><i class="fas fa-envelope"></i> ${escapeHtml(report.userEmail || 'Unknown')}</span>
+                    <span><i class="fas fa-map-marker-alt"></i> ${escapeHtml(report.address || 'Location not specified')}</span>
+                    <span><i class="fas fa-calendar"></i> ${report.timestamp ? new Date(report.timestamp).toLocaleDateString() : ''}</span>
                 </div>
 
                 <div class="admin-actions">
@@ -197,9 +241,7 @@ async function loadAdminDashboard() {
     dashboardSection.innerHTML = '<div class="container"><p style="text-align: center; padding: 20px;">Loading admin dashboard...</p></div>';
 
     await adminManager.loadAllReports();
-    
     dashboardSection.innerHTML = adminManager.getAdminDashboardHTML();
-    
     attachAdminEventListeners();
 }
 
@@ -227,7 +269,7 @@ function attachAdminEventListeners() {
             listEl.innerHTML = `<div class="no-issues">
                 <i class="fas fa-search" style="color:var(--secondary)"></i>
                 <h3>Not found</h3>
-                <p>No report with ticket ID <strong>${val.toUpperCase()}</strong></p>
+                <p>No report with ticket ID <strong>${escapeHtml(val.toUpperCase())}</strong></p>
             </div>`;
             if (ticketClear) ticketClear.style.display = 'inline-block';
             return;
@@ -249,25 +291,19 @@ function attachAdminEventListeners() {
     });
 
     const statusFilter = document.getElementById('statusFilter');
-    if (statusFilter) {
-        statusFilter.addEventListener('change', filterAdminReports);
-    }
+    if (statusFilter) statusFilter.addEventListener('change', filterAdminReports);
 
     const userFilter = document.getElementById('userFilter');
-    if (userFilter) {
-        userFilter.addEventListener('change', filterAdminReports);
-    }
+    if (userFilter) userFilter.addEventListener('change', filterAdminReports);
 
     const searchInput = document.getElementById('adminSearch');
-    if (searchInput) {
-        searchInput.addEventListener('input', filterAdminReports);
-    }
+    if (searchInput) searchInput.addEventListener('input', filterAdminReports);
 
     document.querySelectorAll('.status-dropdown').forEach(dropdown => {
         dropdown.addEventListener('change', async (e) => {
             const reportId = e.target.dataset.reportId;
             const newStatus = e.target.value;
-            
+
             try {
                 const result = await apiService.updateReportStatus(reportId, newStatus);
                 if (result.success) {
@@ -286,7 +322,7 @@ function attachAdminEventListeners() {
     document.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const reportId = e.target.closest('.delete-btn').dataset.reportId;
-            
+
             if (confirm('Are you sure you want to delete this report?')) {
                 try {
                     const result = await apiService.deleteReport(reportId);
@@ -308,10 +344,8 @@ function attachAdminEventListeners() {
         btn.addEventListener('click', (e) => {
             const reportId = e.target.closest('.view-btn').dataset.reportId;
             const report = adminManager.allReports.find(r => r.id === reportId);
-            
-            if (report) {
-                showReportDetailsModal(report);
-            }
+
+            if (report) showReportDetailsModal(report);
         });
     });
 }
@@ -324,26 +358,54 @@ function filterAdminReports() {
     let filtered = adminManager.allReports;
 
     if (searchTerm) {
-        filtered = filtered.filter(r => 
-            r.description.toLowerCase().includes(searchTerm) ||
-            r.userName.toLowerCase().includes(searchTerm) ||
-            r.address.toLowerCase().includes(searchTerm)
+        filtered = filtered.filter(r =>
+            (r.description || '').toLowerCase().includes(searchTerm) ||
+            (r.userName || '').toLowerCase().includes(searchTerm) ||
+            (r.address || '').toLowerCase().includes(searchTerm) ||
+            (r.ticket_id || '').toLowerCase().includes(searchTerm)
         );
     }
 
-    if (statusFilter !== 'all') {
-        filtered = filtered.filter(r => r.status === statusFilter);
-    }
-
-    if (userFilter !== 'all') {
-        filtered = filtered.filter(r => r.userName === userFilter);
-    }
+    if (statusFilter !== 'all') filtered = filtered.filter(r => r.status === statusFilter);
+    if (userFilter !== 'all') filtered = filtered.filter(r => r.userName === userFilter);
 
     const issuesList = document.getElementById('adminIssuesList');
     if (issuesList) {
         issuesList.innerHTML = adminManager.renderAdminIssuesList(filtered);
         attachAdminEventListeners();
     }
+}
+
+function renderCommentBlock(commentObj) {
+    const comment = parseAdminComment(commentObj);
+
+    if (comment.type === 'resolution_proof') {
+        return `
+            <div style="background:#ecfdf3;border:1px solid #b7ebc6;padding:12px;border-radius:10px;margin:8px 0;">
+                <div style="font-weight:700;color:#15803d;margin-bottom:6px;">
+                    <i class="fas fa-check-circle"></i> Resolution Proof Submitted
+                </div>
+                <div style="margin-bottom:8px;">${escapeHtml(comment.message)}</div>
+                ${comment.photos.length > 0 ? `
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:8px;">
+                        ${comment.photos.map(photo => `
+                            <a href="${photo}" target="_blank" rel="noopener noreferrer">
+                                <img src="${photo}" alt="Resolution proof" style="width:100%;height:120px;object-fit:cover;border-radius:8px;border:1px solid rgba(0,0,0,0.08);">
+                            </a>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                <small style="display:block;margin-top:8px;opacity:.75;">${comment.created_at ? new Date(comment.created_at).toLocaleString() : ''}</small>
+            </div>
+        `;
+    }
+
+    return `
+        <div style="background:#f0f0f0;padding:10px;margin:5px 0;border-radius:5px;">
+            <p style="margin:0;"><strong>${comment.created_at ? new Date(comment.created_at).toLocaleString() : ''}</strong></p>
+            <p style="margin:5px 0;">${escapeHtml(comment.message)}</p>
+        </div>
+    `;
 }
 
 function showReportDetailsModal(report) {
@@ -360,12 +422,12 @@ function showReportDetailsModal(report) {
                 <h2>Report Details</h2>
                 <p>${escapeHtml(report.issueType || 'General')} - ${escapeHtml(report.status || 'pending')}</p>
             </div>
-            
+
             <div style="padding: 20px;">
                 <h4>User Information</h4>
                 <p><strong>Name:</strong> ${escapeHtml(report.userName || '')}</p>
                 <p><strong>Email:</strong> ${escapeHtml(report.userEmail || '')}</p>
-                
+
                 <h4>Issue Details</h4>
                 <p><strong>Type:</strong> ${escapeHtml(report.issueType || 'General')}</p>
                 <p><strong>Description:</strong> ${escapeHtml(report.description || '')}</p>
@@ -373,78 +435,121 @@ function showReportDetailsModal(report) {
                 <p><strong>Submitted live location:</strong> ${escapeHtml(formatCoordinates(report.location))}</p>
                 ${getMapsLink(report.location) ? `<p><a href="${getMapsLink(report.location)}" target="_blank" rel="noopener noreferrer"><i class="fas fa-map-marked-alt"></i> Open submitted location in Google Maps</a></p>` : ''}
                 <p><strong>Date:</strong> ${report.timestamp ? new Date(report.timestamp).toLocaleDateString() : ''}</p>
-                
+
                 ${report.photos && report.photos.length > 0 ? `
-                    <h4>Photos</h4>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <h4>Photos Shared by User</h4>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;">
                         ${report.photos.map(photo => `
-                            <img src="${photo}" alt="Report photo" style="max-width: 150px; border-radius: 5px;">
+                            <a href="${photo}" target="_blank" rel="noopener noreferrer">
+                                <img src="${photo}" alt="Report photo" style="max-width:150px;border-radius:5px;">
+                            </a>
                         `).join('')}
                     </div>
                 ` : ''}
-                
-                <h4>Admin Comments</h4>
-                <div id="commentsList" style="margin-bottom: 20px;">
-                    ${report.comments && report.comments.length > 0 ? report.comments.map(c => `
-                        <div style="background: #f0f0f0; padding: 10px; margin: 5px 0; border-radius: 5px;">
-                            <p style="margin: 0;"><strong>${new Date(c.created_at).toLocaleString()}:</strong></p>
-                            <p style="margin: 5px 0;">${escapeHtml(c.comment_text || '')}</p>
-                        </div>
-                    `).join('') : '<p>No comments yet</p>'}
+
+                <h4 style="margin-top:20px;">Admin Updates</h4>
+                <div id="commentsList" style="margin-bottom:20px;">
+                    ${report.comments && report.comments.length > 0
+                        ? report.comments.map(c => renderCommentBlock(c)).join('')
+                        : '<p>No comments yet</p>'}
                 </div>
-                
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="newComment" class="form-control" placeholder="Add a comment..." style="flex: 1;">
-                    <button class="btn btn-primary" onclick="addCommentToReport('${report.id}')">
-                        <i class="fas fa-comment"></i> Add Comment
-                    </button>
+
+                <div style="margin-top:20px;padding:14px;border:1px solid rgba(0,0,0,0.08);border-radius:10px;background:#fafafa;">
+                    <h4 style="margin-bottom:10px;">Add Admin Comment</h4>
+                    <div style="display:flex;gap:10px;">
+                        <input type="text" id="newComment" class="form-control" placeholder="Add a comment..." style="flex:1;">
+                        <button class="btn btn-primary" onclick="addCommentToReport('${report.id}')">
+                            <i class="fas fa-comment"></i> Add Comment
+                        </button>
+                    </div>
                 </div>
-                
-                <div style="margin-top: 20px;">
+
+                <div style="margin-top:20px;padding:14px;border:1px solid #bbf7d0;border-radius:10px;background:#f0fdf4;">
+                    <h4 style="margin-bottom:10px;color:#166534;">Resolve Issue with Proof</h4>
+                    <textarea id="resolutionMessage" class="form-control" rows="4" placeholder="Write what was fixed and any proof details..."></textarea>
+                    <div style="margin-top:10px;">
+                        <label style="display:block;font-weight:600;margin-bottom:6px;">Upload proof photos</label>
+                        <input type="file" id="resolutionProofPhotos" class="form-control" accept="image/*" multiple>
+                        <small style="opacity:.75;">You can upload up to 5 proof images.</small>
+                    </div>
+                    <div style="margin-top:12px;">
+                        <button class="btn btn-success" onclick="resolveIssueWithProof('${report.id}')">
+                            <i class="fas fa-check-circle"></i> Mark Resolved + Send Proof
+                        </button>
+                    </div>
+                </div>
+
+                <div style="margin-top:20px;">
                     <button class="btn btn-outline close-modal">Close</button>
                 </div>
             </div>
         </div>
     `;
-    
+
     document.body.appendChild(modal);
     modal.style.display = 'block';
-    
-    modal.querySelector('.close').addEventListener('click', () => {
-        modal.remove();
-    });
-    
-    modal.querySelector('.close-modal').addEventListener('click', () => {
-        modal.remove();
-    });
-    
+
+    modal.querySelector('.close').addEventListener('click', () => modal.remove());
+    modal.querySelector('.close-modal').addEventListener('click', () => modal.remove());
     modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.remove();
-        }
+        if (e.target === modal) modal.remove();
     });
 }
 
 async function addCommentToReport(reportId) {
     const commentInput = document.getElementById('newComment');
     const comment = commentInput?.value.trim();
-    
+
     if (!comment) {
         showAlert('Please enter a comment', 'error');
         return;
     }
-    
+
     try {
         const result = await apiService.addComment(reportId, comment);
         if (result.success) {
             showAlert('Comment added successfully!', 'success');
-            commentInput.value = '';
             loadAdminDashboard();
         } else {
-            showAlert('Failed to add comment', 'error');
+            showAlert(result.error || 'Failed to add comment', 'error');
         }
     } catch (error) {
         console.error('Error adding comment:', error);
         showAlert('Error adding comment', 'error');
     }
 }
+
+window.resolveIssueWithProof = async function(reportId) {
+    const msgEl = document.getElementById('resolutionMessage');
+    const photosEl = document.getElementById('resolutionProofPhotos');
+
+    const message = (msgEl?.value || '').trim();
+    const files = photosEl?.files || [];
+
+    if (!message) {
+        showAlert('Please enter a resolution message', 'error');
+        return;
+    }
+
+    if (!files.length) {
+        showAlert('Please upload at least 1 proof photo', 'error');
+        return;
+    }
+
+    try {
+        const proofPhotos = await filesToBase64(files);
+        const result = await apiService.resolveWithProof(reportId, message, proofPhotos);
+
+        if (result.success) {
+            showAlert('Issue resolved and proof sent successfully!', 'success');
+            const modal = document.getElementById('reportDetailsModal');
+            if (modal) modal.remove();
+            loadAdminDashboard();
+        } else {
+            showAlert(result.error || 'Failed to resolve issue with proof', 'error');
+        }
+    } catch (error) {
+        console.error('Resolve with proof error:', error);
+        showAlert('Error sending proof photos', 'error');
+    }
+};

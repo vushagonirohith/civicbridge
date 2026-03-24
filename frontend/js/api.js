@@ -111,6 +111,25 @@ const apiService = {
         }
     },
 
+    async resolveWithProof(reportId, comment, proofPhotos = [], adminId = 'admin-001') {
+        try {
+            const response = await fetch(`${API_BASE}/reports/${reportId}/comment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    comment,
+                    adminId,
+                    proofPhotos,
+                    markResolved: true
+                })
+            });
+            return await response.json();
+        } catch (error) {
+            console.error('Resolve with proof error:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
     async deleteReport(reportId) {
         try {
             const response = await fetch(`${API_BASE}/reports/${reportId}`, {
@@ -135,5 +154,4 @@ const apiService = {
             return { success: false, error: error.message };
         }
     }
-
 };
