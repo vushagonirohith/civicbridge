@@ -1,3 +1,116 @@
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function formatCoordinates(locationObj) {
+    if (!locationObj || locationObj.lat == null || locationObj.lng == null) return 'Live location not available';
+    const lat = Number(locationObj.lat);
+    const lng = Number(locationObj.lng);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) return 'Live location not available';
+    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+}
+
+function getMapsLink(locationObj) {
+    if (!locationObj || locationObj.lat == null || locationObj.lng == null) return '';
+    return `https://www.google.com/maps?q=${locationObj.lat},${locationObj.lng}`;
+}
+
+function closeIssueDetailsModal() {
+    const modal = document.getElementById('issueDetailsModal');
+    if (modal) modal.remove();
+}
+
+function showIssueDetailsModal(issue) {
+    closeIssueDetailsModal();
+
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'issueDetailsModal';
+
+    const commentsHtml = issue.comments && issue.comments.length > 0
+        ? issue.comments.map(c => `
+            <div style="background: var(--light); padding: 12px; border-radius: 8px; margin-bottom: 10px;">
+                <div style="font-weight: 600; margin-bottom: 6px;"><i class="fas fa-user-shield"></i> Admin Update</div>
+                <div style="margin-bottom: 6px;">${escapeHtml(c.comment_text || '')}</div>
+                <small style="opacity: 0.75;">${c.created_at ? new Date(c.created_at).toLocaleString() : ''}</small>
+            </div>
+        `).join('')
+        : '<p style="opacity:0.75;">No admin updates yet.</p>';
+
+    const photosHtml = issue.photos && issue.photos.length > 0
+        ? `
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;">
+                ${issue.photos.map((photo, index) => `
+                    <a href="${photo}" target="_blank" rel="noopener noreferrer">
+                        <img src="${photo}" alt="Issue photo ${index + 1}" style="width:100%;height:140px;object-fit:cover;border-radius:10px;border:1px solid rgba(0,0,0,0.08);">
+                    </a>
+                `).join('')}
+            </div>
+        `
+        : '<p style="opacity:0.75;">No photos uploaded for this issue.</p>';
+
+    const mapsLink = getMapsLink(issue.locationObj);
+
+    modal.innerHTML = `
+        <div class="modal-content large-modal">
+            <span class="close">&times;</span>
+            <div class="login-header">
+                <h2>Issue Details</h2>
+                <p>${escapeHtml(issue.title)} • ${escapeHtml((issue.status || 'pending').replace('_', ' '))}</p>
+            </div>
+            <div style="padding: 20px; display:grid; gap:18px;">
+                <div style="background: var(--light); border-radius: 12px; padding: 16px;">
+                    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;">
+                        <div>
+                            <div style="font-size:1.05rem;font-weight:700;">${escapeHtml(issue.title)}</div>
+                            <div style="margin-top:6px;opacity:0.8;">Ticket ID: <strong>${escapeHtml(issue.ticket_id || 'Not assigned')}</strong></div>
+                        </div>
+                        <span class="issue-status status-${escapeHtml(issue.status || 'pending')}">${escapeHtml((issue.status || 'pending').replace('_', ' '))}</span>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 style="margin-bottom:10px;">Issue Summary</h4>
+                    <p><strong>Type:</strong> ${escapeHtml(issue.type || 'General')}</p>
+                    <p><strong>Description:</strong> ${escapeHtml(issue.description || '')}</p>
+                    <p><strong>Submitted on:</strong> ${escapeHtml(issue.date || '')}</p>
+                    <p><strong>Address:</strong> ${escapeHtml(issue.location || 'Location not specified')}</p>
+                    <p><strong>Submitted live location:</strong> ${escapeHtml(formatCoordinates(issue.locationObj))}</p>
+                    ${mapsLink ? `<p><a href="${mapsLink}" target="_blank" rel="noopener noreferrer"><i class="fas fa-map-marked-alt"></i> Open submitted location in Google Maps</a></p>` : ''}
+                </div>
+
+                <div>
+                    <h4 style="margin-bottom:10px;">Uploaded Photos</h4>
+                    ${photosHtml}
+                </div>
+
+                <div>
+                    <h4 style="margin-bottom:10px;">Admin Updates</h4>
+                    ${commentsHtml}
+                </div>
+
+                <div style="display:flex;justify-content:flex-end;">
+                    <button class="btn btn-outline close-issue-modal">Close</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    modal.style.display = 'block';
+
+    modal.querySelector('.close').addEventListener('click', closeIssueDetailsModal);
+    modal.querySelector('.close-issue-modal').addEventListener('click', closeIssueDetailsModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeIssueDetailsModal();
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const dashboardSection = document.getElementById('dashboard');
     if (dashboardSection) {
@@ -39,8 +152,6 @@ function loadDashboard() {
 
 async function loadUserDashboard() {
     const userData = getCurrentUser();
-    const userEmail = localStorage.getItem('userEmail');
-    const userName = localStorage.getItem('userName') || 'User';
     const userId = localStorage.getItem('userId');
     
     console.log('Loading dashboard for user:', userId);
@@ -50,9 +161,9 @@ async function loadUserDashboard() {
 
     dashboardSection.innerHTML = `<div class="container"><p style="text-align: center; padding: 20px;">Loading your dashboard...</p></div>`;
     
-    // Wait for async getUserIssues - fetches from backend
     const userIssues = await getUserIssues();
     
+    window.currentUserIssues = userIssues;
     dashboardSection.innerHTML = getUserDashboardHTML(userData, userIssues);
     initializeDashboard(userIssues);
     initTicketSearch(userIssues);
@@ -62,13 +173,11 @@ function getUserDashboardHTML(userData, userIssues = []) {
     const userName = localStorage.getItem('userName') || 'User';
     const userEmail = localStorage.getItem('userEmail');
     
-    // Calculate user stats from backend data
     const totalIssues = userIssues.length;
     const pendingIssues = userIssues.filter(issue => issue.status === 'pending').length;
     const inProgressIssues = userIssues.filter(issue => issue.status === 'in_progress').length;
     const resolvedIssues = userIssues.filter(issue => issue.status === 'resolved').length;
     
-    // Get user join date from localStorage (set during login)
     const joinDate = userData.created_at ? new Date(userData.created_at).toLocaleDateString() : 'Recently';
     
     return `
@@ -114,14 +223,18 @@ function getUserDashboardHTML(userData, userIssues = []) {
                 <button class="filter-btn" data-filter="resolved">Resolved</button>
             </div>
 
-            <div class="ticket-search-bar" style="display:flex;gap:10px;margin-bottom:16px;align-items:center;">
-                <input type="text" id="ticketSearchInput" class="form-control"
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px;">
+                <input
+                    type="text"
+                    id="ticketSearchInput"
+                    class="form-control"
                     placeholder="Search by Ticket ID (e.g. CB-00001)"
-                    style="flex:1;font-family:monospace;text-transform:uppercase;">
-                <button class="btn btn-primary" id="ticketSearchBtn" style="white-space:nowrap;">
+                    style="max-width:320px;font-family:monospace;text-transform:uppercase;"
+                />
+                <button class="btn btn-outline" id="ticketSearchBtn">
                     <i class="fas fa-search"></i> Search
                 </button>
-                <button class="btn btn-outline" id="ticketSearchClear" style="display:none;white-space:nowrap;">
+                <button class="btn btn-outline" id="ticketSearchClear" style="display:none;">
                     Clear
                 </button>
             </div>
@@ -129,20 +242,35 @@ function getUserDashboardHTML(userData, userIssues = []) {
             <div class="issues-list" id="issuesList">
                 ${renderIssuesList(userIssues)}
             </div>
-            
-            ${userIssues.length > 0 ? `
-                <div style="margin-top: 2rem; padding: 1rem; background: var(--light); border-radius: 8px;">
-                    <h4><i class="fas fa-chart-bar"></i> Your Reporting Activity</h4>
-                    <p>You have submitted ${totalIssues} issue reports with ${resolvedIssues} resolved so far.</p>
-                    <div style="background: var(--card-bg); padding: 1rem; border-radius: 4px; margin-top: 0.5rem;">
-                        <strong>Quick Stats:</strong>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 0.5rem;">
+
+            ${totalIssues > 0 ? `
+                <div class="dashboard-card" style="margin-top: 2rem;">
+                    <h3><i class="fas fa-chart-line"></i> Activity Summary</h3>
+                    <div style="display: grid; gap: 1rem; margin-top: 1rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>Response Rate</span>
+                            <span style="font-weight: 600;">${totalIssues > 0 ? Math.round(((inProgressIssues + resolvedIssues) / totalIssues) * 100) : 0}%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${totalIssues > 0 ? ((inProgressIssues + resolvedIssues) / totalIssues) * 100 : 0}%"></div>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>Resolution Rate</span>
+                            <span style="font-weight: 600;">${totalIssues > 0 ? Math.round((resolvedIssues / totalIssues) * 100) : 0}%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${totalIssues > 0 ? (resolvedIssues / totalIssues) * 100 : 0}%"></div>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
                             <span>Resolution Rate: ${totalIssues > 0 ? Math.round((resolvedIssues / totalIssues) * 100) : 0}%</span>
                             <span>Active Issues: ${pendingIssues + inProgressIssues}</span>
                         </div>
                     </div>
                 </div>
             ` : ''}
+
         </div>
     `;
 }
@@ -167,7 +295,6 @@ function getLoginPromptHTML() {
 }
 
 function initializeDashboard(allIssues) {
-    // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const filter = this.getAttribute('data-filter');
@@ -178,7 +305,6 @@ function initializeDashboard(allIssues) {
         });
     });
 
-    // Refresh button
     const refreshBtn = document.getElementById('refreshDashboardBtn');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', function() {
@@ -190,7 +316,6 @@ function initializeDashboard(allIssues) {
         });
     }
 
-    // Report from dashboard button
     const reportBtn = document.getElementById('reportFromDashboard');
     if (reportBtn) {
         reportBtn.addEventListener('click', function() {
@@ -201,7 +326,6 @@ function initializeDashboard(allIssues) {
     }
 }
 
-// FETCH FROM BACKEND API ONLY - NO localStorage
 async function getUserIssues() {
     const userId = localStorage.getItem('userId');
     console.log('getUserIssues called with userId:', userId);
@@ -231,7 +355,8 @@ async function getUserIssues() {
                     date: report.timestamp ? new Date(report.timestamp).toLocaleDateString() : new Date().toLocaleDateString(),
                     location: report.address || 'Location not specified',
                     comments: report.comments || [],
-                    photos: report.photos || []
+                    photos: report.photos || [],
+                    locationObj: report.location || null
                 };
             });
         } else {
@@ -306,16 +431,26 @@ function filterIssues(filter, allIssues) {
     }
 }
 
-// Global functions for issue actions
 window.viewIssue = function(issueId) {
-    alert('Issue ID: ' + issueId + '\n\nThis feature will show full issue details in a modal.');
+    const issues = Array.isArray(window.currentUserIssues) ? window.currentUserIssues : [];
+    const issue = issues.find(item => item.id === issueId);
+    if (!issue) {
+        showAlert('Issue details could not be loaded.', 'error');
+        return;
+    }
+    showIssueDetailsModal(issue);
 };
 
 window.viewIssuePhotos = function(issueId) {
-    alert('Issue ID: ' + issueId + '\n\nThis will show all photos for this issue.');
+    const issues = Array.isArray(window.currentUserIssues) ? window.currentUserIssues : [];
+    const issue = issues.find(item => item.id === issueId);
+    if (!issue) {
+        showAlert('Issue photos could not be loaded.', 'error');
+        return;
+    }
+    showIssueDetailsModal(issue);
 };
 
-// ── Ticket ID Search (user dashboard) ────────────────────────────────────
 function initTicketSearch(allIssues) {
     const input = document.getElementById('ticketSearchInput');
     const btn   = document.getElementById('ticketSearchBtn');
@@ -357,7 +492,8 @@ function initTicketSearch(allIssues) {
             date: r.timestamp ? new Date(r.timestamp).toLocaleDateString() : '',
             location: r.address || 'Location not specified',
             comments: r.comments || [],
-            photos: r.photos || []
+            photos: r.photos || [],
+            locationObj: r.location || null
         }];
 
         listEl.innerHTML = renderIssuesList(mapped);

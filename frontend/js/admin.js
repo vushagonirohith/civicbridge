@@ -1,4 +1,27 @@
 // Admin Dashboard Management
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function formatCoordinates(locationObj) {
+    if (!locationObj || locationObj.lat == null || locationObj.lng == null) return 'Live location not available';
+    const lat = Number(locationObj.lat);
+    const lng = Number(locationObj.lng);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) return 'Live location not available';
+    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+}
+
+function getMapsLink(locationObj) {
+    if (!locationObj || locationObj.lat == null || locationObj.lng == null) return '';
+    return `https://www.google.com/maps?q=${locationObj.lat},${locationObj.lng}`;
+}
+
 class AdminManager {
     constructor() {
         this.allReports = [];
@@ -171,25 +194,19 @@ async function loadAdminDashboard() {
         return;
     }
 
-    // Show loading state
     dashboardSection.innerHTML = '<div class="container"><p style="text-align: center; padding: 20px;">Loading admin dashboard...</p></div>';
 
-    // Wait for reports to load
     await adminManager.loadAllReports();
     
-    // Render dashboard
     dashboardSection.innerHTML = adminManager.getAdminDashboardHTML();
     
-    // Attach event listeners
     attachAdminEventListeners();
 }
 
 function attachAdminEventListeners() {
-    // Refresh button
     const refreshBtn = document.getElementById('refreshAdminDashboardBtn');
     if (refreshBtn) refreshBtn.addEventListener('click', loadAdminDashboard);
 
-    // ── Ticket ID search ─────────────────────────────────────────
     const ticketInput = document.getElementById('adminTicketSearch');
     const ticketBtn   = document.getElementById('adminTicketSearchBtn');
     const ticketClear = document.getElementById('adminTicketClear');
@@ -231,25 +248,21 @@ function attachAdminEventListeners() {
         loadAdminDashboard();
     });
 
-    // Status filter
     const statusFilter = document.getElementById('statusFilter');
     if (statusFilter) {
         statusFilter.addEventListener('change', filterAdminReports);
     }
 
-    // User filter
     const userFilter = document.getElementById('userFilter');
     if (userFilter) {
         userFilter.addEventListener('change', filterAdminReports);
     }
 
-    // Search
     const searchInput = document.getElementById('adminSearch');
     if (searchInput) {
         searchInput.addEventListener('input', filterAdminReports);
     }
 
-    // Status dropdowns
     document.querySelectorAll('.status-dropdown').forEach(dropdown => {
         dropdown.addEventListener('change', async (e) => {
             const reportId = e.target.dataset.reportId;
@@ -259,7 +272,7 @@ function attachAdminEventListeners() {
                 const result = await apiService.updateReportStatus(reportId, newStatus);
                 if (result.success) {
                     showAlert('Status updated successfully!', 'success');
-                    loadAdminDashboard(); // Refresh
+                    loadAdminDashboard();
                 } else {
                     showAlert('Failed to update status', 'error');
                 }
@@ -270,7 +283,6 @@ function attachAdminEventListeners() {
         });
     });
 
-    // Delete buttons
     document.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const reportId = e.target.closest('.delete-btn').dataset.reportId;
@@ -280,7 +292,7 @@ function attachAdminEventListeners() {
                     const result = await apiService.deleteReport(reportId);
                     if (result.success) {
                         showAlert('Report deleted successfully!', 'success');
-                        loadAdminDashboard(); // Refresh
+                        loadAdminDashboard();
                     } else {
                         showAlert('Failed to delete report', 'error');
                     }
@@ -292,7 +304,6 @@ function attachAdminEventListeners() {
         });
     });
 
-    // View details buttons
     document.querySelectorAll('.view-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const reportId = e.target.closest('.view-btn').dataset.reportId;
@@ -312,7 +323,6 @@ function filterAdminReports() {
 
     let filtered = adminManager.allReports;
 
-    // Filter by search
     if (searchTerm) {
         filtered = filtered.filter(r => 
             r.description.toLowerCase().includes(searchTerm) ||
@@ -321,25 +331,25 @@ function filterAdminReports() {
         );
     }
 
-    // Filter by status
     if (statusFilter !== 'all') {
         filtered = filtered.filter(r => r.status === statusFilter);
     }
 
-    // Filter by user
     if (userFilter !== 'all') {
         filtered = filtered.filter(r => r.userName === userFilter);
     }
 
-    // Render filtered results
     const issuesList = document.getElementById('adminIssuesList');
     if (issuesList) {
         issuesList.innerHTML = adminManager.renderAdminIssuesList(filtered);
-        attachAdminEventListeners(); // Re-attach listeners
+        attachAdminEventListeners();
     }
 }
 
 function showReportDetailsModal(report) {
+    const oldModal = document.getElementById('reportDetailsModal');
+    if (oldModal) oldModal.remove();
+
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.id = 'reportDetailsModal';
@@ -348,19 +358,21 @@ function showReportDetailsModal(report) {
             <span class="close">&times;</span>
             <div class="login-header">
                 <h2>Report Details</h2>
-                <p>${report.issueType} - ${report.status}</p>
+                <p>${escapeHtml(report.issueType || 'General')} - ${escapeHtml(report.status || 'pending')}</p>
             </div>
             
             <div style="padding: 20px;">
                 <h4>User Information</h4>
-                <p><strong>Name:</strong> ${report.userName}</p>
-                <p><strong>Email:</strong> ${report.userEmail}</p>
+                <p><strong>Name:</strong> ${escapeHtml(report.userName || '')}</p>
+                <p><strong>Email:</strong> ${escapeHtml(report.userEmail || '')}</p>
                 
                 <h4>Issue Details</h4>
-                <p><strong>Type:</strong> ${report.issueType}</p>
-                <p><strong>Description:</strong> ${report.description}</p>
-                <p><strong>Location:</strong> ${report.address}</p>
-                <p><strong>Date:</strong> ${new Date(report.timestamp).toLocaleDateString()}</p>
+                <p><strong>Type:</strong> ${escapeHtml(report.issueType || 'General')}</p>
+                <p><strong>Description:</strong> ${escapeHtml(report.description || '')}</p>
+                <p><strong>Location:</strong> ${escapeHtml(report.address || 'Location not specified')}</p>
+                <p><strong>Submitted live location:</strong> ${escapeHtml(formatCoordinates(report.location))}</p>
+                ${getMapsLink(report.location) ? `<p><a href="${getMapsLink(report.location)}" target="_blank" rel="noopener noreferrer"><i class="fas fa-map-marked-alt"></i> Open submitted location in Google Maps</a></p>` : ''}
+                <p><strong>Date:</strong> ${report.timestamp ? new Date(report.timestamp).toLocaleDateString() : ''}</p>
                 
                 ${report.photos && report.photos.length > 0 ? `
                     <h4>Photos</h4>
@@ -376,7 +388,7 @@ function showReportDetailsModal(report) {
                     ${report.comments && report.comments.length > 0 ? report.comments.map(c => `
                         <div style="background: #f0f0f0; padding: 10px; margin: 5px 0; border-radius: 5px;">
                             <p style="margin: 0;"><strong>${new Date(c.created_at).toLocaleString()}:</strong></p>
-                            <p style="margin: 5px 0;">${c.comment_text}</p>
+                            <p style="margin: 5px 0;">${escapeHtml(c.comment_text || '')}</p>
                         </div>
                     `).join('') : '<p>No comments yet</p>'}
                 </div>
@@ -427,7 +439,7 @@ async function addCommentToReport(reportId) {
         if (result.success) {
             showAlert('Comment added successfully!', 'success');
             commentInput.value = '';
-            loadAdminDashboard(); // Refresh
+            loadAdminDashboard();
         } else {
             showAlert('Failed to add comment', 'error');
         }
