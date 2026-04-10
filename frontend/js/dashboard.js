@@ -57,17 +57,36 @@ function getProgressInfo(issue) {
     return { label: 'Pending', value: 20 };
 }
 
-function getLatestCommentPreview(comments) {
+function getLatestCommentPreview(comments, issueId) {
     if (!comments || !comments.length) return '';
     const latest = parseAdminComment(comments[comments.length - 1]);
 
     if (latest.type === 'resolution_proof') {
+        const thumbsHtml = latest.photos.length ? `
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;">
+                ${latest.photos.map(url => `
+                    <a href="${url}" target="_blank" rel="noopener noreferrer"
+                       style="display:block;width:80px;height:80px;border-radius:8px;overflow:hidden;border:2px solid #22c55e;flex-shrink:0;">
+                        <img src="${url}" alt="Proof photo"
+                             style="width:100%;height:100%;object-fit:cover;"
+                             onerror="this.parentElement.style.display='none'">
+                    </a>
+                `).join('')}
+            </div>
+            <button class="btn btn-small"
+                onclick="viewIssue('${issueId}')"
+                style="background:#16a34a;color:white;border:none;padding:6px 14px;border-radius:6px;font-size:0.8rem;cursor:pointer;margin-top:4px;">
+                <i class="fas fa-images"></i> View All Proof Photos (${latest.photos.length})
+            </button>` : '';
+
         return `
-            <div class="admin-comment-user">
-                <strong><i class="fas fa-check-circle"></i> Resolution Update:</strong>
-                <p>${escapeHtml(latest.message)}</p>
-                ${latest.photos.length ? `<small>${latest.photos.length} proof photo(s) attached</small><br>` : ''}
-                <small>Last updated: ${latest.created_at ? new Date(latest.created_at).toLocaleString() : ''}</small>
+            <div class="admin-comment-user" style="border-left:3px solid #22c55e;background:#f0fdf4;">
+                <strong style="color:#15803d;"><i class="fas fa-check-circle"></i> Resolution Update:</strong>
+                <p style="margin:6px 0;">${escapeHtml(latest.message)}</p>
+                ${thumbsHtml}
+                <small style="display:block;margin-top:6px;opacity:0.7;">
+                    Last updated: ${latest.created_at ? new Date(latest.created_at).toLocaleString() : ''}
+                </small>
             </div>
         `;
     }
@@ -451,7 +470,7 @@ function renderIssuesList(issues) {
                 <span><i class="fas fa-calendar"></i> ${escapeHtml(issue.date || '')}</span>
                 ${issue.photos && issue.photos.length > 0 ? `<span><i class="fas fa-camera"></i> ${issue.photos.length} photo(s)</span>` : ''}
             </div>
-            ${getLatestCommentPreview(issue.comments)}
+            ${getLatestCommentPreview(issue.comments, issue.id)}
             <div style="margin-top:12px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                     <small style="font-weight:600;">Progress</small>
