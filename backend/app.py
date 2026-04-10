@@ -329,6 +329,70 @@ def delete_report(report_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+
+@app.route('/api/reports/<report_id>/resolve-with-proof', methods=['POST'])
+def resolve_with_proof(report_id):
+    """
+    Admin sends resolution proof: a message + up to 5 photos.
+    Photos are uploaded to Supabase Storage.
+    The comment is saved as a special JSON string prefixed with __RESOLUTION_PROOF__
+    so the frontend can parse it and show the proof photos to the user.
+    """
+    try:
+        data = request.json
+        message = (data.get('message') or '').strip()
+        photos_b64 = data.get('photos', [])
+        admin_id = data.get('adminId', 'admin-001')
+
+        if not message:
+            return jsonify({'success': False, 'error': 'Resolution message is required'}), 400
+
+        # Upload proof photos to Supabase Storage
+        proof_urls = []
+        for idx, photo_b64 in enumerate(photos_b64[:5]):
+            try:
+                raw = photo_b64.split(',')[1] if ',' in photo_b64 else photo_b64
+                photo_bytes = base64.b64decode(raw)
+                filename = f"{report_id}/proof_{idx}_{int(datetime.now().timestamp())}.jpg"
+
+                supabase_admin.storage.from_('report-photos').upload(
+                    filename, photo_bytes, {'content-type': 'image/jpeg'}
+                )
+
+                url_result = supabase_admin.storage.from_('report-photos').get_public_url(filename)
+                public_url = url_result if isinstance(url_result, str) else (
+                    url_result.get('publicUrl') or url_result.get('public_url') or str(url_result)
+                )
+                proof_urls.append(public_url)
+                print(f"Proof photo {idx} uploaded: {public_url}")
+
+            except Exception as e:
+                print(f"Proof photo {idx} failed: {e}")
+
+        # Save as special comment that dashboard.js can parse
+        import json
+        comment_text = '__RESOLUTION_PROOF__' + json.dumps({
+            'message': message,
+            'photos': proof_urls
+        })
+
+        supabase.table('admin_comments').insert({
+            'report_id': report_id,
+            'admin_id': admin_id,
+            'comment_text': comment_text
+        }).execute()
+
+        # Also update report status to resolved
+        supabase.table('reports').update({'status': 'resolved'}).eq('id', report_id).execute()
+
+        print(f"Report {report_id} resolved with {len(proof_urls)} proof photo(s)")
+        return jsonify({'success': True, 'proofPhotos': len(proof_urls)}), 201
+
+    except Exception as e:
+        print(f"Resolve with proof error: {e}")
+        import traceback; traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     return jsonify({'status': 'ok', 'timestamp': datetime.utcnow().isoformat()}), 200

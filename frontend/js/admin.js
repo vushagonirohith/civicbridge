@@ -49,6 +49,18 @@ function parseAdminComment(commentObj) {
     };
 }
 
+function hasResolutionProof(comments = []) {
+    return Array.isArray(comments) && comments.some(commentObj => {
+        const parsed = parseAdminComment(commentObj);
+        return parsed.type === 'resolution_proof';
+    });
+}
+
+function getEffectiveStatus(report) {
+    if (hasResolutionProof(report?.comments || [])) return 'resolved';
+    return report?.status || 'pending';
+}
+
 async function filesToBase64(files) {
     const arr = Array.from(files || []).slice(0, 5);
     const results = [];
@@ -173,9 +185,9 @@ class AdminManager {
     calculateStats(reports) {
         return {
             total: reports.length,
-            pending: reports.filter(r => r.status === 'pending').length,
-            inProgress: reports.filter(r => r.status === 'in_progress').length,
-            resolved: reports.filter(r => r.status === 'resolved').length
+            pending: reports.filter(r => getEffectiveStatus(r) === 'pending').length,
+            inProgress: reports.filter(r => getEffectiveStatus(r) === 'in_progress').length,
+            resolved: reports.filter(r => getEffectiveStatus(r) === 'resolved').length
         };
     }
 
@@ -190,39 +202,43 @@ class AdminManager {
             `;
         }
 
-        return reports.map(report => `
-            <div class="admin-issue-card">
-                <div class="issue-header">
-                    <div>
-                        <div class="issue-title">${escapeHtml(report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General')} Issue</div>
-                        <span class="issue-type">${escapeHtml(report.issueType || 'General')}</span>
-                        ${report.ticket_id ? `<span style="margin-left:8px;font-family:monospace;font-size:0.78rem;font-weight:700;color:var(--secondary);background:var(--light);padding:2px 8px;border-radius:4px;"><i class="fas fa-ticket-alt"></i> ${escapeHtml(report.ticket_id)}</span>` : ''}
-                    </div>
-                    <span class="issue-status status-${escapeHtml(report.status || 'pending')}">${escapeHtml((report.status || 'pending').replace('_', ' '))}</span>
-                </div>
-                <div class="issue-description">${escapeHtml(report.description || '')}</div>
-                <div class="issue-meta">
-                    <span><i class="fas fa-user"></i> ${escapeHtml(report.userName || 'Unknown')}</span>
-                    <span><i class="fas fa-envelope"></i> ${escapeHtml(report.userEmail || 'Unknown')}</span>
-                    <span><i class="fas fa-map-marker-alt"></i> ${escapeHtml(report.address || 'Location not specified')}</span>
-                    <span><i class="fas fa-calendar"></i> ${report.timestamp ? new Date(report.timestamp).toLocaleDateString() : ''}</span>
-                </div>
+        return reports.map(report => {
+            const effectiveStatus = getEffectiveStatus(report);
 
-                <div class="admin-actions">
-                    <select class="status-dropdown" data-report-id="${report.id}">
-                        <option value="pending" ${report.status === 'pending' ? 'selected' : ''}>Pending</option>
-                        <option value="in_progress" ${report.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
-                        <option value="resolved" ${report.status === 'resolved' ? 'selected' : ''}>Resolved</option>
-                    </select>
-                    <button class="btn btn-secondary btn-small view-btn" data-report-id="${report.id}">
-                        <i class="fas fa-eye"></i> View Details
-                    </button>
-                    <button class="btn btn-danger btn-small delete-btn" data-report-id="${report.id}">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
+            return `
+                <div class="admin-issue-card">
+                    <div class="issue-header">
+                        <div>
+                            <div class="issue-title">${escapeHtml(report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General')} Issue</div>
+                            <span class="issue-type">${escapeHtml(report.issueType || 'General')}</span>
+                            ${report.ticket_id ? `<span style="margin-left:8px;font-family:monospace;font-size:0.78rem;font-weight:700;color:var(--secondary);background:var(--light);padding:2px 8px;border-radius:4px;"><i class="fas fa-ticket-alt"></i> ${escapeHtml(report.ticket_id)}</span>` : ''}
+                        </div>
+                        <span class="issue-status status-${escapeHtml(effectiveStatus)}">${escapeHtml(effectiveStatus.replace('_', ' '))}</span>
+                    </div>
+                    <div class="issue-description">${escapeHtml(report.description || '')}</div>
+                    <div class="issue-meta">
+                        <span><i class="fas fa-user"></i> ${escapeHtml(report.userName || 'Unknown')}</span>
+                        <span><i class="fas fa-envelope"></i> ${escapeHtml(report.userEmail || 'Unknown')}</span>
+                        <span><i class="fas fa-map-marker-alt"></i> ${escapeHtml(report.address || 'Location not specified')}</span>
+                        <span><i class="fas fa-calendar"></i> ${report.timestamp ? new Date(report.timestamp).toLocaleDateString() : ''}</span>
+                    </div>
+
+                    <div class="admin-actions">
+                        <select class="status-dropdown" data-report-id="${report.id}">
+                            <option value="pending" ${effectiveStatus === 'pending' ? 'selected' : ''}>Pending</option>
+                            <option value="in_progress" ${effectiveStatus === 'in_progress' ? 'selected' : ''}>In Progress</option>
+                            <option value="resolved" ${effectiveStatus === 'resolved' ? 'selected' : ''}>Resolved</option>
+                        </select>
+                        <button class="btn btn-secondary btn-small view-btn" data-report-id="${report.id}">
+                            <i class="fas fa-eye"></i> View Details
+                        </button>
+                        <button class="btn btn-danger btn-small delete-btn" data-report-id="${report.id}">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 }
 
@@ -366,7 +382,7 @@ function filterAdminReports() {
         );
     }
 
-    if (statusFilter !== 'all') filtered = filtered.filter(r => r.status === statusFilter);
+    if (statusFilter !== 'all') filtered = filtered.filter(r => getEffectiveStatus(r) === statusFilter);
     if (userFilter !== 'all') filtered = filtered.filter(r => r.userName === userFilter);
 
     const issuesList = document.getElementById('adminIssuesList');
@@ -415,12 +431,15 @@ function showReportDetailsModal(report) {
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.id = 'reportDetailsModal';
+
+    const effectiveStatus = getEffectiveStatus(report);
+
     modal.innerHTML = `
         <div class="modal-content large-modal">
             <span class="close">&times;</span>
             <div class="login-header">
                 <h2>Report Details</h2>
-                <p>${escapeHtml(report.issueType || 'General')} - ${escapeHtml(report.status || 'pending')}</p>
+                <p>${escapeHtml(report.issueType || 'General')} - ${escapeHtml(effectiveStatus)}</p>
             </div>
 
             <div style="padding: 20px;">
@@ -541,6 +560,11 @@ window.resolveIssueWithProof = async function(reportId) {
         const result = await apiService.resolveWithProof(reportId, message, proofPhotos);
 
         if (result.success) {
+            const reportIndex = adminManager.allReports.findIndex(r => r.id === reportId);
+            if (reportIndex !== -1) {
+                adminManager.allReports[reportIndex].status = 'resolved';
+            }
+
             showAlert('Issue resolved and proof sent successfully!', 'success');
             const modal = document.getElementById('reportDetailsModal');
             if (modal) modal.remove();

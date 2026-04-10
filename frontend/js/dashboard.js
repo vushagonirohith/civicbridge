@@ -33,6 +33,30 @@ function parseAdminComment(commentObj) {
     };
 }
 
+function hasResolutionProof(comments = []) {
+    return Array.isArray(comments) && comments.some(commentObj => {
+        const parsed = parseAdminComment(commentObj);
+        return parsed.type === 'resolution_proof';
+    });
+}
+
+function getEffectiveStatus(issue) {
+    if (hasResolutionProof(issue?.comments || [])) return 'resolved';
+    return issue?.status || 'pending';
+}
+
+function getProgressInfo(issue) {
+    const status = getEffectiveStatus(issue);
+
+    if (status === 'resolved') {
+        return { label: 'Completed', value: 100 };
+    }
+    if (status === 'in_progress') {
+        return { label: 'In Progress', value: 60 };
+    }
+    return { label: 'Pending', value: 20 };
+}
+
 function getLatestCommentPreview(comments) {
     if (!comments || !comments.length) return '';
     const latest = parseAdminComment(comments[comments.length - 1]);
@@ -102,6 +126,8 @@ function showIssueDetailsModal(issue) {
     modal.className = 'modal';
     modal.id = 'issueDetailsModal';
 
+    const effectiveStatus = getEffectiveStatus(issue);
+
     const commentsHtml = issue.comments && issue.comments.length > 0
         ? issue.comments.map(c => renderCommentDetails(c)).join('')
         : '<p style="opacity:0.75;">No admin updates yet.</p>';
@@ -123,7 +149,7 @@ function showIssueDetailsModal(issue) {
             <span class="close">&times;</span>
             <div class="login-header">
                 <h2>Issue Details</h2>
-                <p>${escapeHtml(issue.title)} • ${escapeHtml((issue.status || 'pending').replace('_', ' '))}</p>
+                <p>${escapeHtml(issue.title)} • ${escapeHtml(effectiveStatus.replace('_', ' '))}</p>
             </div>
             <div style="padding: 20px; display:grid; gap:18px;">
                 <div style="background: var(--light); border-radius: 12px; padding: 16px;">
@@ -132,7 +158,7 @@ function showIssueDetailsModal(issue) {
                             <div style="font-size:1.05rem;font-weight:700;">${escapeHtml(issue.title)}</div>
                             <div style="margin-top:6px;opacity:0.8;">Ticket ID: <strong>${escapeHtml(issue.ticket_id || 'Not assigned')}</strong></div>
                         </div>
-                        <span class="issue-status status-${escapeHtml(issue.status || 'pending')}">${escapeHtml((issue.status || 'pending').replace('_', ' '))}</span>
+                        <span class="issue-status status-${escapeHtml(effectiveStatus)}">${escapeHtml(effectiveStatus.replace('_', ' '))}</span>
                     </div>
                 </div>
 
@@ -174,14 +200,16 @@ function showIssueDetailsModal(issue) {
 document.addEventListener('DOMContentLoaded', function() {
     const dashboardSection = document.getElementById('dashboard');
     if (dashboardSection) {
+        let dashboardLoaded = false;
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
-                if (entry.isIntersecting) {
+                if (entry.isIntersecting && !dashboardLoaded) {
+                    dashboardLoaded = true;
+                    observer.disconnect();
                     loadDashboard();
                 }
             });
-        });
-        
+        }, { threshold: 0.1 });
         observer.observe(dashboardSection);
     }
 });
@@ -210,8 +238,6 @@ function loadDashboard() {
 
 async function loadUserDashboard() {
     const userData = getCurrentUser();
-    const userId = localStorage.getItem('userId');
-    
     const dashboardSection = document.getElementById('dashboard');
     if (!dashboardSection) return;
 
@@ -230,9 +256,9 @@ function getUserDashboardHTML(userData, userIssues = []) {
     const userEmail = localStorage.getItem('userEmail');
 
     const totalIssues = userIssues.length;
-    const pendingIssues = userIssues.filter(issue => issue.status === 'pending').length;
-    const inProgressIssues = userIssues.filter(issue => issue.status === 'in_progress').length;
-    const resolvedIssues = userIssues.filter(issue => issue.status === 'resolved').length;
+    const pendingIssues = userIssues.filter(issue => getEffectiveStatus(issue) === 'pending').length;
+    const inProgressIssues = userIssues.filter(issue => getEffectiveStatus(issue) === 'in_progress').length;
+    const resolvedIssues = userIssues.filter(issue => getEffectiveStatus(issue) === 'resolved').length;
 
     const joinDate = userData.created_at ? new Date(userData.created_at).toLocaleDateString() : 'Recently';
 
@@ -365,18 +391,25 @@ async function getUserIssues() {
         const result = await apiService.getUserReports(userId);
 
         if (result.success && result.reports) {
-            return result.reports.map(report => ({
-                id: report.id,
-                ticket_id: report.ticket_id || '',
-                type: report.issueType,
-                title: `${report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General'} Issue`,
-                description: report.description,
-                status: report.status || 'pending',
-                date: report.timestamp ? new Date(report.timestamp).toLocaleDateString() : new Date().toLocaleDateString(),
-                location: report.address || 'Location not specified',
-                comments: report.comments || [],
-                photos: report.photos || []
-            }));
+            return result.reports.map(report => {
+                const mapped = {
+                    id: report.id,
+                    ticket_id: report.ticket_id || '',
+                    type: report.issueType,
+                    title: `${report.issueType?.charAt(0).toUpperCase() + report.issueType?.slice(1) || 'General'} Issue`,
+                    description: report.description,
+                    status: report.status || 'pending',
+                    date: report.timestamp ? new Date(report.timestamp).toLocaleDateString() : new Date().toLocaleDateString(),
+                    location: report.address || 'Location not specified',
+                    comments: report.comments || [],
+                    photos: report.photos || []
+                };
+
+                mapped.status = getEffectiveStatus(mapped);
+                mapped.progress = getProgressInfo(mapped);
+
+                return mapped;
+            });
         }
 
         showAlert('Failed to load reports from database', 'error');
@@ -419,6 +452,15 @@ function renderIssuesList(issues) {
                 ${issue.photos && issue.photos.length > 0 ? `<span><i class="fas fa-camera"></i> ${issue.photos.length} photo(s)</span>` : ''}
             </div>
             ${getLatestCommentPreview(issue.comments)}
+            <div style="margin-top:12px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <small style="font-weight:600;">Progress</small>
+                    <small style="font-weight:700;">${escapeHtml(issue.progress?.label || 'Pending')} - ${issue.progress?.value || 20}%</small>
+                </div>
+                <div style="width:100%;height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden;">
+                    <div style="width:${issue.progress?.value || 20}%;height:100%;background:${issue.status === 'resolved' ? '#22c55e' : issue.status === 'in_progress' ? '#f59e0b' : '#3b82f6'};border-radius:999px;"></div>
+                </div>
+            </div>
             <div class="issue-actions">
                 <button class="btn btn-outline btn-small" onclick="viewIssue('${issue.id}')">View Details</button>
                 ${issue.photos && issue.photos.length > 0 ? `<button class="btn btn-outline btn-small" onclick="viewIssuePhotos('${issue.id}')">View Photos</button>` : ''}
@@ -431,7 +473,7 @@ function filterIssues(filter, allIssues) {
     let filteredIssues = allIssues;
 
     if (filter !== 'all') {
-        filteredIssues = allIssues.filter(issue => issue.status === filter);
+        filteredIssues = allIssues.filter(issue => getEffectiveStatus(issue) === filter);
     }
 
     const issuesList = document.getElementById('issuesList');
@@ -489,7 +531,7 @@ function initTicketSearch(allIssues) {
         }
 
         const r = result.report;
-        const mapped = [{
+        const mappedItem = {
             id: r.id,
             ticket_id: r.ticket_id,
             type: r.issueType,
@@ -500,7 +542,12 @@ function initTicketSearch(allIssues) {
             location: r.address || 'Location not specified',
             comments: r.comments || [],
             photos: r.photos || []
-        }];
+        };
+
+        mappedItem.status = getEffectiveStatus(mappedItem);
+        mappedItem.progress = getProgressInfo(mappedItem);
+
+        const mapped = [mappedItem];
 
         window.currentUserIssues = mapped;
         listEl.innerHTML = renderIssuesList(mapped);
